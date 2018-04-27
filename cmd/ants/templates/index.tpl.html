@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, user-scalable=no">
+    <script src="/static/js/jquery-3.3.1.min.js"></script>
+    <script src="/static/js/phaser.min.js"></script>
+</head>
+<body>
+
+<script>
+    var ants = new Map();
+</script>
+
+<script>
+
+    var canvas_width = window.innerWidth * window.devicePixelRatio;
+    var canvas_height = window.innerHeight * window.devicePixelRatio;
+    var conn = null;
+    var lastUpdate = Date.now();
+    var efectiveUpdatePeriod = 0;
+
+    $(document).ready(function () {
+        game = new Phaser.Game(canvas_width, canvas_height, Phaser.AUTO);
+        gameBootstrapper.init();
+    });
+
+    var gameProperties = {
+        gameWidthMeters:{{.GameWidth}},
+        gameHeightMeters:{{.GameHeight}},
+        updateClientPeriod:{{.UpdateClientPeriod}},
+        pixels2Meters:{{.PixelsToMeters}}
+    };
+    var main = function (game) {
+
+        setInterval(function () {
+            var visibleAnts = 0;
+            var quietAnts = 0;
+            var inCamera = 0;
+            var count = 0;
+
+            ants.forEach(function (ant) {
+                if (ant.ant.visible) visibleAnts++;
+                if (ant.ant.speed === 0) quietAnts++;
+                if (ant.ant.inCamera) inCamera++;
+                count++;
+            });
+            console.log(
+                    game.time.fps + " fps. ",
+                    game.time.ups + " ups",
+                    visibleAnts + " visible, ",
+                    quietAnts + " quiet, ",
+                    inCamera + " inCamera, ",
+                    efectiveUpdatePeriod + "ms efectiveupdateperiod, ",
+                    count + ' ants map size.'
+            );
+        }, 1000);
+
+    };
+
+    main.prototype = {
+        preload: function () {
+            game.scale.scaleMode = Phaser.ScaleManager.RESIZE;
+            game.world.setBounds(0, 0, meters2Pixels(gameProperties.gameWidthMeters), meters2Pixels(gameProperties.gameHeightMeters), false, false, false, false);
+            game.time.desiredFps = 48;
+            game.time.advancedTiming = true
+            game.stage.disableVisibilityChange = true;
+            game.physics.startSystem(Phaser.Physics.ARCADE);
+
+        },
+        //this function is fired once when we load the game
+        create: function () {
+            console.log("client started");
+            createBackground(game);
+            createCamera(game);
+            conn = initWS();
+            setInterval(function () {
+                sendViewPort(game, conn)
+            }, 100);
+        },
+        update: function () {
+            updateCamera(game, pointer);
+        }
+    };
+
+    function updateAnts(game) {
+
+        ants.forEach(function (antInfo, key, map) {
+
+            var ant = antInfo.ant;
+            if (ant === null) {
+                ant = game.add.graphics(antInfo.X, antInfo.Y);
+                ant.anchor.setTo(0.5, 0.5);
+
+                ant.beginFill(Math.random() * 0x888888 + 0x888888, 1);
+                ant.drawRect(meters2Pixels(-2), meters2Pixels(-2), meters2Pixels(4), meters2Pixels(4));
+                ant.endFill();
+                ant.alpha = 0;
+
+                game.add.tween(ant).to({alpha: 1}, 500, Phaser.Easing.None, true);
+
+
+                game.physics.enable(ant, Phaser.Physics.ARCADE);
+                ant.body.allowRotation = true;
+                ant.body.angle = antInfo.Angle;
+
+
+                antInfo.ant = ant;
+                map.set(key, antInfo);
+            }
+            if (antInfo.visible) {
+                ant.body.moves = true;
+                if (ant.visible) {
+                    game.physics.arcade.moveToXY(ant, antInfo.X, antInfo.Y, 500, 1 * 1000 * gameProperties.updateClientPeriod);
+                } else {
+                    ant.x = antInfo.X;
+                    ant.y = antInfo.Y;
+                    ant.velocity = new Phaser.Point(0, 0);
+                    ant.visible = true;
+                }
+                ant.angle = antInfo.Angle;
+            } else {
+                ant.visible = false;
+                ant.body.destroy();
+                map.delete(key);
+            }
+        })
+    }
+
+
+    function createBackground(game) {
+        game.stage.backgroundColor = 0x000020;
+        for (var i = 0; i < 500; i++) {
+            var star = game.add.graphics(Math.floor(Math.random() * meters2Pixels(gameProperties.gameWidthMeters)), Math.floor(Math.random() * meters2Pixels(gameProperties.gameHeightMeters)));
+            star.radius = Math.floor(Math.random() * 10);
+            star.beginFill(0x505070);
+            star.drawCircle(0, 0, star.radius * 2);
+            star.endFill();
+            star.anchor.setTo(0, 0);
+            star.body_size = star.radius;
+            star.alpha = 0;
+            game.add.tween(star).to( { "alpha":1 }, 3000 + Math.random()*3000, Phaser.Easing.Linear.None, true, 0, -1, true);
+
+
+
+        }
+    }
+
+    function createCamera(game) {
+        pointer = game.add.graphics(meters2Pixels(gameProperties.gameWidthMeters / 2), meters2Pixels(gameProperties.gameHeightMeters / 2));
+        pointer.radius = 10;
+        pointer.anchor.setTo(1, 0.5);
+        pointer.body_size = pointer.radius;
+        game.physics.enable(pointer, Phaser.Physics.ARCADE);
+        pointer.body.fixedRotation = true;
+
+        game.camera.follow(pointer, Phaser.Camera.FOLLOW_LOCKON, 0.5, 0.5);
+
+    }
+
+    function updateCamera(game, pointer) {
+        var distance2pointer = game.physics.arcade.distanceToPointer(pointer);
+        if (distance2pointer > pointer.radius * 2) {
+            var speed = distance2pointer > meters2Pixels(400) ? meters2Pixels(400) : distance2pointer;
+            if (game.input.mousePointer.isDown) {
+                speed = meters2Pixels(500);
+            }
+            game.physics.arcade.moveToPointer(pointer, speed, game.input.activePointer);
+        }
+    }
+
+    function refreshAntsPosition(positions) {
+
+        ants.forEach(function (ant) {
+            ant.visible = false
+        });
+
+        positions.forEach(function (newPosition) {
+            var ant = null;
+            var previous = ants.get(newPosition.ID);
+            if (previous) {
+                ant = previous.ant;
+            }
+            ants.set(newPosition.ID, {
+                ant: ant,
+                X: meters2Pixels(newPosition.X),
+                Y: meters2Pixels(newPosition.Y),
+                /*Vx: meters2Pixels(newPosition.Vx),
+                Vy: meters2Pixels(newPosition.Vy),*/
+                Angle: newPosition.R * 180 / Math.PI,
+                visible: true
+            });
+        });
+    }
+
+
+    var gameBootstrapper = {
+        init: function () {
+            game.state.add('main', main);
+            game.state.start('main');
+        }
+    };
+
+    function initWS() {
+        var socket = new WebSocket("ws://" + window.location.host + "/ws/");
+        socket.onopen = function () {
+            console.log("Socket is open");
+            setInterval(function () {
+                updateAnts(game);
+            }, 1000 * gameProperties.updateClientPeriod);
+
+        };
+        socket.onmessage = function (e) {
+            refreshAntsPosition(JSON.parse(e.data))
+            var now = Date.now();
+            efectiveUpdatePeriod = now - lastUpdate;
+            lastUpdate = now;
+        };
+        socket.onclose = function () {
+            console.log("Socket closed");
+        };
+        socket.onerror = function (e) {
+            console.log("Got an error: " + e)
+        };
+        return socket;
+    }
+
+    function sendViewPort(game, conn) {
+        cam = game.camera;
+        zoom = 1.2;
+
+        msg = {
+            t: "v",
+            d: {
+                x: 0.95 * pixels2Meters(cam.x),
+                y: 0.95 * pixels2Meters(cam.y),
+                xx: 1.05 * pixels2Meters(cam.x + cam.width),
+                yy: 1.05 * pixels2Meters(cam.y + cam.height)
+            }
+        };
+        if (conn.readyState === conn.OPEN) {
+            conn.send(JSON.stringify(msg))
+        }
+    }
+
+    function meters2Pixels(meters) {
+        return meters * gameProperties.pixels2Meters;
+    }
+
+    function pixels2Meters(pixels) {
+        return pixels / gameProperties.pixels2Meters;
+    }
+
+</script>
+
+
+</body>
+</html>
