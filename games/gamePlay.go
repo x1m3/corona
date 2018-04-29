@@ -6,14 +6,6 @@ import (
 	"github.com/x1m3/elixir/pubsub"
 )
 
-type Game interface {
-	Init()
-	StartGame() command.Response
-	ProcessCommand(command.Request) command.Response
-	EventListener() <-chan pubsub.Event
-	Stop()
-}
-
 type GamePlay struct {
 	moneyMoverService *economy.ApplyMovementBetweenAccountsService
 	game              Game
