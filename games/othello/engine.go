@@ -113,8 +113,8 @@ func (b *board) EvalMove(player int8, moveToX int, moveToY int) []*tuple {
 
 func (b *board) evalMoveHoriz(player int8, moveToX int, moveToY int) []*tuple {
 	eats := make([]*tuple, 0)
+	acum := make([]*tuple, 0)
 	for _, deltaX := range []int{-1, 1} {
-		acum := make([]*tuple, 0)
 		for x := moveToX + deltaX; x >= 0 && x < WIDTH; x += deltaX {
 			if b[x][moveToY] != player && b[x][moveToY] != EMPTY && !b.outOfLimits(x+deltaX, moveToY) {
 				acum = append(acum, &tuple{X: x, Y: moveToY})
@@ -132,8 +132,8 @@ func (b *board) evalMoveHoriz(player int8, moveToX int, moveToY int) []*tuple {
 
 func (b *board) evalMoveVert(player int8, moveToX int, moveToY int) []*tuple {
 	eats := make([]*tuple, 0)
+	acum := make([]*tuple, 0)
 	for _, deltaY := range []int{-1, 1} {
-		acum := make([]*tuple, 0)
 		for y := moveToY + deltaY; y >= 0 && y < HEIGHT; y += deltaY {
 			if b[moveToX][y] != player && b[moveToX][y] != EMPTY && !b.outOfLimits(moveToX, y+deltaY) {
 				acum = append(acum, &tuple{X: moveToX, Y: y})
@@ -151,9 +151,9 @@ func (b *board) evalMoveVert(player int8, moveToX int, moveToY int) []*tuple {
 
 func (b *board) evalMoveDiagonal(player int8, moveToX int, moveToY int) []*tuple {
 	eats := make([]*tuple, 0)
+	acum := make([]*tuple, 0)
 	for _, deltaX := range []int{-1, 1} {
 		for _, deltaY := range []int{-1, 1} {
-			acum := make([]*tuple, 0)
 			for x, y := moveToX+deltaX, moveToY+deltaY; x >= 0 && x < WIDTH && y >= 0 && y < HEIGHT; x, y = x+deltaX, y+deltaY {
 				if b[x][y] != player && b[x][y] != EMPTY && !b.outOfLimits(x+deltaX, y+deltaY) {
 					acum = append(acum, &tuple{X: x, Y: y})
