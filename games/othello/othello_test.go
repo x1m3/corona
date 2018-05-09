@@ -3,12 +3,11 @@ package othello
 import (
 	"testing"
 	"fmt"
-	"math/rand"
-	"time"
 )
 
 func TestCanMove(t *testing.T) {
-	var board board
+
+	board := NewBoard(8, 8)
 	board.Init()
 
 	// horizontal
@@ -65,10 +64,11 @@ func TestCanMove(t *testing.T) {
 }
 
 func TestCanMoveDiagonal(t *testing.T) {
-	var board board
+	board := NewBoard(8, 8)
 	board.Init()
-	board[3][2] = BLACK
-	board[3][3] = BLACK
+
+	board.board[3][2] = BLACK
+	board.board[3][3] = BLACK
 
 	if got, expected := len(board.EvalMove(WHITE, 2, 2)), 1; got != expected {
 		t.Error("This position is valid.")
@@ -79,8 +79,9 @@ func TestCanMoveDiagonal(t *testing.T) {
 }
 
 func TestBoard_Count(t *testing.T) {
-	var board board
+	board := NewBoard(8, 8)
 	board.Init()
+
 	w, b, e := board.Count()
 	if w != 2 {
 		t.Error("Expecting 2 whites")
@@ -94,7 +95,7 @@ func TestBoard_Count(t *testing.T) {
 }
 
 func TestValidMovementsForPlayer(t *testing.T) {
-	var board board
+	board := NewBoard(8, 8)
 	board.Init()
 
 	inArray := func(p *tuple, l []*tuple) bool {
@@ -134,21 +135,22 @@ func TestValidMovementsForPlayer(t *testing.T) {
 }
 
 func TestValidMovementsForPlayerDiagonal(t *testing.T) {
-	var board board
+	board := NewBoard(8, 8)
 	board.Init()
-	board[0][2] = WHITE
-	board[2][2] = WHITE
 
-	board[1][3] = WHITE
-	board[2][3] = BLACK
-	board[3][3] = BLACK
-	board[4][3] = BLACK
+	board.board[0][2] = WHITE
+	board.board[2][2] = WHITE
 
-	board[2][4] = WHITE
-	board[3][4] = WHITE
-	board[4][4] = WHITE
+	board.board[1][3] = WHITE
+	board.board[2][3] = BLACK
+	board.board[3][3] = BLACK
+	board.board[4][3] = BLACK
 
-	inArray := func(p *tuple, l []*tuple) bool {
+	board.board[2][4] = WHITE
+	board.board[3][4] = WHITE
+	board.board[4][4] = WHITE
+
+	inArray := func(p tuple, l []tuple) bool {
 		for _, c := range l {
 			if c.X == p.X && c.Y == p.Y {
 				return true
@@ -157,9 +159,9 @@ func TestValidMovementsForPlayerDiagonal(t *testing.T) {
 		return false
 	}
 
-	expected := []*tuple{
-		&tuple{3, 4},
-		&tuple{3, 5},
+	expected := []tuple{
+		tuple{3, 4},
+		tuple{3, 5},
 	}
 
 	changes, err := board.Move(BLACK, 3, 5)
@@ -176,13 +178,14 @@ func TestValidMovementsForPlayerDiagonal(t *testing.T) {
 }
 
 func TestBoard_Clone(t *testing.T) {
-	var origin board
-
+	var i, j int8
+	origin := NewBoard(8, 8)
 	origin.Init()
+
 	dest := origin.Clone()
-	for i := 0; i < WIDTH; i++ {
-		for j := 0; j < HEIGHT; j++ {
-			if origin[i][j] != dest[i][j] {
+	for i = 0; i < origin.Width; i++ {
+		for j = 0; j < origin.Height; j++ {
+			if origin.board[i][j] != dest.board[i][j] {
 				t.Error("Boards differ.")
 			}
 		}
@@ -190,7 +193,14 @@ func TestBoard_Clone(t *testing.T) {
 }
 
 func TestBoard_IsEdge(t *testing.T) {
-	var b board
+	var i, j, WIDTH, HEIGHT int8
+
+	HEIGHT = 8
+	WIDTH = 8
+
+	b := NewBoard(WIDTH, HEIGHT)
+	b.Init()
+
 	var edges = []tuple{{0, 0}, {0, HEIGHT - 1}, {WIDTH - 1, HEIGHT - 1}, {WIDTH - 1, 0}}
 
 	for _, p := range edges {
@@ -199,8 +209,8 @@ func TestBoard_IsEdge(t *testing.T) {
 		}
 	}
 
-	for i := 0; i < WIDTH; i++ {
-		for j := 0; j < HEIGHT; j++ {
+	for i = 0; i < WIDTH; i++ {
+		for j = 0; j < HEIGHT; j++ {
 			if !inArray(tuple{i, j}, edges) {
 				if b.isEdge(i, j) {
 					t.Errorf("[%d,%d] shouldn't be an edge.", i, j)
@@ -212,7 +222,7 @@ func TestBoard_IsEdge(t *testing.T) {
 }
 
 func TestBoard_IsSide(t *testing.T) {
-	var b board
+	var i, j, WIDTH, HEIGHT int8
 	var sides = []tuple{
 		{0, 0},
 		{1, 0},
@@ -250,6 +260,11 @@ func TestBoard_IsSide(t *testing.T) {
 		{7, 6},
 		{7, 7},
 	}
+	HEIGHT = 8
+	WIDTH = 8
+
+	b := NewBoard(WIDTH, HEIGHT)
+	b.Init()
 
 	for _, p := range sides {
 		if !b.isSide(p.X, p.Y) {
@@ -257,8 +272,8 @@ func TestBoard_IsSide(t *testing.T) {
 		}
 	}
 
-	for i := 0; i < WIDTH; i++ {
-		for j := 0; j < HEIGHT; j++ {
+	for i = 0; i < WIDTH; i++ {
+		for j = 0; j < HEIGHT; j++ {
 			if !inArray(tuple{i, j}, sides) {
 				if b.isEdge(i, j) {
 					t.Errorf("[%d,%d] shouldn't be an side.", i, j)
@@ -270,7 +285,7 @@ func TestBoard_IsSide(t *testing.T) {
 }
 
 func TestBoard_IsNearEdge(t *testing.T) {
-	var b board
+	var i, j, WIDTH, HEIGHT int8
 	var neardEdge = []tuple{
 		{1, 0},
 		{1, 1},
@@ -288,6 +303,11 @@ func TestBoard_IsNearEdge(t *testing.T) {
 		{6, 7},
 		{7, 6},
 	}
+	HEIGHT = 8
+	WIDTH = 8
+
+	b := NewBoard(WIDTH, HEIGHT)
+	b.Init()
 
 	for _, p := range neardEdge {
 		if !b.isNearEdge(p.X, p.Y) {
@@ -295,8 +315,8 @@ func TestBoard_IsNearEdge(t *testing.T) {
 		}
 	}
 
-	for i := 0; i < WIDTH; i++ {
-		for j := 0; j < HEIGHT; j++ {
+	for i = 0; i < WIDTH; i++ {
+		for j = 0; j < HEIGHT; j++ {
 			if !inArray(tuple{i, j}, neardEdge) {
 				if b.isNearEdge(i, j) {
 					t.Errorf("[%d,%d] shouldn't be a near edge.", i, j)
@@ -308,11 +328,8 @@ func TestBoard_IsNearEdge(t *testing.T) {
 }
 
 func TestGame_Ends(t *testing.T) {
-	var board board
-
-	rand.Seed(time.Now().Unix())
+	board := NewBoard(8,8)
 	board.Init()
-
 
 	for {
 		whiteCannotPlay := false
