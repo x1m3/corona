@@ -167,7 +167,6 @@ func TestValidMovementsForPlayerDiagonal(t *testing.T) {
 		t.Error(err)
 	}
 
-
 	for _, mov := range changes {
 		if !inArray(mov, expected) {
 			t.Errorf("[%d,%d] shouldn't change", mov.X, mov.Y)
@@ -314,33 +313,35 @@ func TestGame_Ends(t *testing.T) {
 	rand.Seed(time.Now().Unix())
 	board.Init()
 
+
 	for {
-		whiteError := false
-		blackError := false
+		whiteCannotPlay := false
 		fmt.Println("WHITE PLAYS:")
 		_, err := board.ComputerMove(WHITE)
 		if err != nil {
+			whiteCannotPlay = true
 			fmt.Println(err)
-			whiteError = true
+
 		}
 		fmt.Print(string(board.Dump()))
-		w, b, e := board.Count()
-		fmt.Printf("WHITES:%d, BLACKS:%d, EMPTIES:%d\n\n", w, b, e)
+		b, w, e := board.Count()
+		fmt.Printf("WHITES[X]:%d, BLACKS[0]:%d, EMPTIES:%d\n\n", w, b, e)
 
+		blackCannotPlay := false
 		fmt.Println("BLACK PLAYS:")
-		board.ComputerMove(BLACK)
+		_, err = board.ComputerMoveMinMax(BLACK)
 		if err != nil {
+			blackCannotPlay = true
 			fmt.Println(err)
-			blackError = true
+
 		}
 		fmt.Print(string(board.Dump()))
-		w, b, e = board.Count()
-		fmt.Printf("WHITES:%d, BLACKS:%d, EMPTIES:%d\n\n", w, b, e)
+		b, w, e = board.Count()
+		fmt.Printf("WHITES[X]:%d, BLACKS[0]:%d, EMPTIES:%d\n\n", w, b, e)
 
-		if whiteError && blackError {
-			return
+		if whiteCannotPlay && blackCannotPlay {
+			break
 		}
-
 	}
 
 }
