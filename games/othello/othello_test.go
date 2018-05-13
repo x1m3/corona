@@ -9,11 +9,11 @@ import (
 
 type nullcache struct {}
 
-func (c *nullcache) Movements(id [64]byte, player int8) ([]tuple, bool) {
+func (c *nullcache) Movements(id SerializedBoard, player int8) ([]tuple, bool) {
 	return nil, false
 }
 
-func (c *nullcache) StoreMovements(player int8, id [64]byte, movements []tuple) {
+func (c *nullcache) StoreMovements(player int8, id SerializedBoard, movements []tuple) {
 	return
 }
 
