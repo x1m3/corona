@@ -129,7 +129,7 @@ func (b *board) ComputerMove(player int8) ([]tuple, error) {
 func (b *board) ComputerMoveMinMax(player int8) ([]tuple, error) {
 	var bestMovement tuple
 	var oppositePlayer int8
-	if player==WHITE{
+	if player == WHITE {
 		oppositePlayer = BLACK
 	} else {
 		oppositePlayer = WHITE
@@ -140,7 +140,7 @@ func (b *board) ComputerMoveMinMax(player int8) ([]tuple, error) {
 	for _, movement := range b.ValidMovementsForPlayer(player) {
 		newBoard := b.Clone()
 		newBoard.Move(player, movement.X, movement.Y)
-		score := newBoard.minimax(oppositePlayer, 5, false)
+		score := newBoard.minimax(oppositePlayer, 5, false, math.MinInt64, math.MaxInt64)
 		if bestScore < score {
 			bestScore = score
 			bestMovement = movement
@@ -169,11 +169,11 @@ func (b *board) ValidMovementsForPlayer(player int8) []tuple {
 }
 
 func (b *board) EvalMove(player int8, moveToX int8, moveToY int8) []tuple {
-	/*
-	if b[moveToX][moveToY] != EMPTY { // Cannot move to an empty position
+
+	if b.board[moveToX][moveToY] != EMPTY { // Cannot move to an empty position
 		return nil
 	}
-	*/
+
 	eats := make([]tuple, 0, 24)
 	eats = b.evalMoveHoriz(player, eats, moveToX, moveToY)
 	eats = b.evalMoveVert(player, eats, moveToX, moveToY)
@@ -320,8 +320,7 @@ func (b *board) isSide(x, y int8) bool {
 	return x == 0 || x == b.Width-1 || y == 0 || y == b.Height-1
 }
 
-func (b *board) minimax(player int8, depth int8, maxMin bool) int {
-	var bestVal int
+func (b *board) minimax(player int8, depth int8, maxMin bool, alpha int, beta int) int {
 	var opositePlayer int8
 
 	if depth == 0 {
@@ -333,27 +332,28 @@ func (b *board) minimax(player int8, depth int8, maxMin bool) int {
 		opositePlayer = WHITE
 	}
 	if maxMin {
-		bestVal = math.MinInt64
 		for _, movement := range b.ValidMovementsForPlayer(player) {
 			newBoard := b.Clone()
 			newBoard.Move(player, movement.X, movement.Y)
-			minmax := newBoard.minimax(opositePlayer, depth-1, !maxMin)
-			if bestVal < minmax {
-				bestVal = minmax
+			minmax := newBoard.minimax(opositePlayer, depth-1, !maxMin, alpha, beta)
+			alpha = max(alpha, minmax)
+			if beta <= alpha {
+				break
 			}
 		}
+		return alpha
 	} else {
-		bestVal = math.MaxInt64
 		for _, movement := range b.ValidMovementsForPlayer(player) {
 			newBoard := b.Clone()
 			newBoard.Move(player, movement.X, movement.Y)
-			minmax := newBoard.minimax(opositePlayer, depth-1, !maxMin)
-			if bestVal > minmax {
-				bestVal = minmax
+			minmax := newBoard.minimax(opositePlayer, depth-1, !maxMin, alpha, beta)
+			beta = min(beta, minmax)
+			if beta <= alpha {
+				break
 			}
 		}
+		return beta
 	}
-	return bestVal
 }
 
 func (b *board) Dump() []byte {
@@ -381,7 +381,15 @@ func (b *board) Dump() []byte {
 }
 
 func max(x, y int) int {
-	if x>y {
+	if x > y {
+		return x
+	} else {
+		return y
+	}
+}
+
+func min(x, y int) int {
+	if x <= y {
 		return x
 	} else {
 		return y
