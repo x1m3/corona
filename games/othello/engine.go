@@ -12,8 +12,8 @@ const BLACK = 1
 const WHITE = 2
 
 type MovementsCache interface{
-	Movements(id []byte, player int8) ([]tuple, bool)
-	StoreMovements(player int8, id []byte, movements []tuple)
+	Movements(id [64]byte, player int8) ([]tuple, bool)
+	StoreMovements(player int8, id [64]byte, movements []tuple)
 }
 
 type tuple struct {
@@ -62,9 +62,8 @@ func (b *board) Clone() *board {
 	return newBoard
 }
 
-func (b *board) ID() []byte {
+func (b *board) ID() (id [64]byte) {
 
-	id := make([]byte, b.Width*b.Height, b.Width*b.Height)
 	for i := range b.board {
 		for j, val := range b.board[i] {
 			id[i*int(b.Width)+j] = byte(val)
@@ -74,7 +73,7 @@ func (b *board) ID() []byte {
 }
 
 // Please, call Init() first
-func (b *board) RestoreFromID(id []byte) {
+func (b *board) RestoreFromID(id [64]byte) {
 	for x := range b.board {
 		for y := range b.board[x] {
 			b.board[x][y] = int8(id[int8(x)*b.Width+int8(y)])
@@ -147,7 +146,7 @@ func (b *board) ComputerMoveMinMax(player int8) ([]tuple, error) {
 	for _, movement := range b.ValidMovementsForPlayer(player) {
 		newBoard := b.Clone()
 		newBoard.Move(player, movement.X, movement.Y)
-		score := newBoard.minimax(oppositePlayer, 5, false, math.MinInt64, math.MaxInt64)
+		score := newBoard.minimax(oppositePlayer, 7, false, math.MinInt64, math.MaxInt64)
 		if bestScore < score {
 			bestScore = score
 			bestMovement = movement

@@ -4,15 +4,16 @@ import (
 	"testing"
 	"fmt"
 	"math/rand"
+	"time"
 )
 
 type nullcache struct {}
 
-func (c *nullcache) Movements(id []byte, player int8) ([]tuple, bool) {
+func (c *nullcache) Movements(id [64]byte, player int8) ([]tuple, bool) {
 	return nil, false
 }
 
-func (c *nullcache) StoreMovements(player int8, id []byte, movements []tuple) {
+func (c *nullcache) StoreMovements(player int8, id [64]byte, movements []tuple) {
 	return
 }
 
@@ -362,7 +363,46 @@ func Test_ID_And_RestoreFromID(t *testing.T) {
 }
 
 func TestGame_Ends(t *testing.T) {
-	board := NewBoard(8, 8, &nullcache{})
+	board := NewBoard(8, 8, NewMapMovementsCache())
+
+	board.Init()
+
+	start := time.Now()
+
+	for {
+		whiteCannotPlay := false
+		fmt.Println("WHITE PLAYS:")
+		_, err := board.ComputerMove(WHITE)
+		if err != nil {
+			whiteCannotPlay = true
+			fmt.Println(err)
+
+		}
+		fmt.Print(string(board.Dump()))
+		b, w, e := board.Count()
+		fmt.Printf("WHITES[X]:%d, BLACKS[0]:%d, EMPTIES:%d\n\n", w, b, e)
+
+		blackCannotPlay := false
+		fmt.Println("BLACK PLAYS:")
+		_, err = board.ComputerMoveMinMax(BLACK)
+		if err != nil {
+			blackCannotPlay = true
+			fmt.Println(err)
+
+		}
+		fmt.Print(string(board.Dump()))
+		b, w, e = board.Count()
+		fmt.Printf("WHITES[X]:%d, BLACKS[0]:%d, EMPTIES:%d\n\n", w, b, e)
+
+		if whiteCannotPlay && blackCannotPlay {
+			break
+		}
+	}
+
+	elapsed1 := time.Since(start)
+	start2 := time.Now()
+
+
 	board.Init()
 
 	for {
@@ -394,6 +434,11 @@ func TestGame_Ends(t *testing.T) {
 			break
 		}
 	}
+
+	elapsed2 := time.Since(start2)
+
+	fmt.Printf("Elapsed1: <%v>\nElapsed2: <%v>\n", elapsed1, elapsed2)
+
 
 }
 
