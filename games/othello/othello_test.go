@@ -6,9 +6,19 @@ import (
 	"math/rand"
 )
 
+type nullcache struct {}
+
+func (c *nullcache) Movements(id []byte, player int8) ([]tuple, bool) {
+	return nil, false
+}
+
+func (c *nullcache) StoreMovements(player int8, id []byte, movements []tuple) {
+	return
+}
+
 func TestCanMove(t *testing.T) {
 
-	board := NewBoard(8, 8)
+	board := NewBoard(8, 8, &nullcache{})
 	board.Init()
 
 	// horizontal
@@ -65,7 +75,7 @@ func TestCanMove(t *testing.T) {
 }
 
 func TestCanMoveDiagonal(t *testing.T) {
-	board := NewBoard(8, 8)
+	board := NewBoard(8, 8, &nullcache{})
 	board.Init()
 
 	board.board[3][2] = BLACK
@@ -80,7 +90,7 @@ func TestCanMoveDiagonal(t *testing.T) {
 }
 
 func TestBoard_Count(t *testing.T) {
-	board := NewBoard(8, 8)
+	board := NewBoard(8, 8, &nullcache{})
 	board.Init()
 
 	w, b, e := board.Count()
@@ -96,7 +106,7 @@ func TestBoard_Count(t *testing.T) {
 }
 
 func TestValidMovementsForPlayer(t *testing.T) {
-	board := NewBoard(8, 8)
+	board := NewBoard(8, 8, &nullcache{})
 	board.Init()
 
 	inArray := func(p tuple, l []tuple) bool {
@@ -136,7 +146,7 @@ func TestValidMovementsForPlayer(t *testing.T) {
 }
 
 func TestValidMovementsForPlayerDiagonal(t *testing.T) {
-	board := NewBoard(8, 8)
+	board := NewBoard(8, 8, &nullcache{})
 	board.Init()
 
 	board.board[0][2] = WHITE
@@ -180,7 +190,7 @@ func TestValidMovementsForPlayerDiagonal(t *testing.T) {
 
 func TestBoard_Clone(t *testing.T) {
 	var i, j int8
-	origin := NewBoard(8, 8)
+	origin := NewBoard(8, 8, &nullcache{})
 	origin.Init()
 
 	dest := origin.Clone()
@@ -199,7 +209,7 @@ func TestBoard_IsEdge(t *testing.T) {
 	HEIGHT = 8
 	WIDTH = 8
 
-	b := NewBoard(WIDTH, HEIGHT)
+	b := NewBoard(WIDTH, HEIGHT, &nullcache{})
 	b.Init()
 
 	var edges = []tuple{{0, 0}, {0, HEIGHT - 1}, {WIDTH - 1, HEIGHT - 1}, {WIDTH - 1, 0}}
@@ -264,7 +274,7 @@ func TestBoard_IsSide(t *testing.T) {
 	HEIGHT = 8
 	WIDTH = 8
 
-	b := NewBoard(WIDTH, HEIGHT)
+	b := NewBoard(WIDTH, HEIGHT, &nullcache{})
 	b.Init()
 
 	for _, p := range sides {
@@ -307,7 +317,7 @@ func TestBoard_IsNearEdge(t *testing.T) {
 	HEIGHT = 8
 	WIDTH = 8
 
-	b := NewBoard(WIDTH, HEIGHT)
+	b := NewBoard(WIDTH, HEIGHT, &nullcache{})
 	b.Init()
 
 	for _, p := range neardEdge {
@@ -329,8 +339,8 @@ func TestBoard_IsNearEdge(t *testing.T) {
 }
 
 func Test_ID_And_RestoreFromID(t *testing.T) {
-	board := NewBoard(8, 8)
-	otherBoard := NewBoard(8, 8)
+	board := NewBoard(8, 8, &nullcache{})
+	otherBoard := NewBoard(8, 8, &nullcache{})
 	board.Init()
 
 	for n := 0; n < 1000000; n++ {
@@ -352,7 +362,7 @@ func Test_ID_And_RestoreFromID(t *testing.T) {
 }
 
 func TestGame_Ends(t *testing.T) {
-	board := NewBoard(8, 8)
+	board := NewBoard(8, 8, &nullcache{})
 	board.Init()
 
 	for {

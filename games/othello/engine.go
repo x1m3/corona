@@ -11,6 +11,11 @@ const EMPTY = 0
 const BLACK = 1
 const WHITE = 2
 
+type MovementsCache interface{
+	Movements(id []byte, player int8) ([]tuple, bool)
+	StoreMovements(player int8, id []byte, movements []tuple)
+}
+
 type tuple struct {
 	X int8
 	Y int8
@@ -20,12 +25,14 @@ type board struct {
 	Width  int8
 	Height int8
 	board  [][]int8
+	movementsCache MovementsCache
 }
 
-func NewBoard(width, height int8) *board {
+func NewBoard(width, height int8, cache MovementsCache) *board {
 	b := &board{
 		Width:  width,
 		Height: height,
+		movementsCache:cache,
 	}
 	b.board = make([][]int8, width)
 	for i := range b.board {
@@ -48,7 +55,7 @@ func (b *board) Init() {
 
 func (b *board) Clone() *board {
 
-	newBoard := NewBoard(b.Width, b.Height)
+	newBoard := NewBoard(b.Width, b.Height, b.movementsCache)
 	for i := range b.board {
 		copy(newBoard.board[i], b.board[i])
 	}
@@ -155,6 +162,12 @@ func (b *board) ComputerMoveMinMax(player int8) ([]tuple, error) {
 
 func (b *board) ValidMovementsForPlayer(player int8) []tuple {
 
+	boardID := b.ID()
+
+	if movements, found := b.movementsCache.Movements(boardID, player); found {
+		return movements
+	}
+
 	movements := make([]tuple, 0)
 	for i := range b.board {
 		for j := range b.board[i] {
@@ -165,10 +178,16 @@ func (b *board) ValidMovementsForPlayer(player int8) []tuple {
 			}
 		}
 	}
+
+	b.movementsCache.StoreMovements(player, boardID, movements)
 	return movements
 }
 
 func (b *board) EvalMove(player int8, moveToX int8, moveToY int8) []tuple {
+	return b.evalMove(player, moveToX, moveToY)
+}
+
+func (b *board) evalMove(player int8, moveToX int8, moveToY int8) []tuple {
 
 	if b.board[moveToX][moveToY] != EMPTY { // Cannot move to an empty position
 		return nil
@@ -181,6 +200,7 @@ func (b *board) EvalMove(player int8, moveToX int8, moveToY int8) []tuple {
 
 	return eats
 }
+
 
 func (b *board) evalMoveHoriz(player int8, eats []tuple, moveToX int8, moveToY int8) []tuple {
 	var x, toX, deltaX int8
