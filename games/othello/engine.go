@@ -5,13 +5,14 @@ import (
 	"math"
 	"bytes"
 	"fmt"
+	"encoding/binary"
 )
 
 const EMPTY = 0
 const BLACK = 1
 const WHITE = 2
 
-type MovementsCache interface{
+type MovementsCache interface {
 	Movements(id SerializedBoard, player int8) ([]tuple, bool)
 	StoreMovements(player int8, id SerializedBoard, movements []tuple)
 }
@@ -22,19 +23,19 @@ type tuple struct {
 }
 
 type board struct {
-	Width  int8
-	Height int8
-	board  [][]int8
+	Width          int8
+	Height         int8
+	board          [][]int8
 	movementsCache MovementsCache
 }
 
-type SerializedBoard [64]byte
+type SerializedBoard [16]byte
 
 func NewBoard(width, height int8, cache MovementsCache) *board {
 	b := &board{
-		Width:  width,
-		Height: height,
-		movementsCache:cache,
+		Width:          width,
+		Height:         height,
+		movementsCache: cache,
 	}
 	b.board = make([][]int8, width)
 	for i := range b.board {
@@ -65,20 +66,54 @@ func (b *board) Clone() *board {
 }
 
 func (b *board) Serialize() (id SerializedBoard) {
+	var temp uint64
+	var n int8
+	var nn int8
 
 	for i := range b.board {
-		for j, val := range b.board[i] {
-			id[i*int(b.Width)+j] = byte(val)
+		for _, val := range b.board[i] {
+			temp <<= 2
+			temp |= uint64(val)
+			n += 2
+			if n >= 64 {
+				binary.LittleEndian.PutUint64(id[nn*8:], temp)
+				n = 0
+				temp = 0
+				nn++
+			}
 		}
 	}
+
 	return id
 }
 
 // Please, call Init() first
 func (b *board) Unserialize(id SerializedBoard) {
+	var temp,mask uint64
+	var n int8
+	var nn int8
+	var i int
+	acum := make([]byte, b.Width * b.Height)
+	mask = math.MaxUint64
+	mask <<=62
+	for {
+		temp = binary.LittleEndian.Uint64(id[nn*8:])
+		for n=0; n<64; n+=2 {
+			aux := temp & mask
+			aux >>= 62
+			acum[i] = byte(aux)
+			temp <<= 2
+			i++
+		}
+		nn++
+		if i>= int(b.Width * b.Height) {
+			break
+		}
+	}
+
 	for x := range b.board {
 		for y := range b.board[x] {
-			b.board[x][y] = int8(id[int8(x)*b.Width+int8(y)])
+			b.board[x][y] = int8(acum[int8(x)*b.Width+int8(y)])
 		}
 	}
 }
@@ -201,7 +236,6 @@ func (b *board) evalMove(player int8, moveToX int8, moveToY int8) []tuple {
 
 	return eats
 }
-
 
 func (b *board) evalMoveHoriz(player int8, eats []tuple, moveToX int8, moveToY int8) []tuple {
 	var x, toX, deltaX int8
