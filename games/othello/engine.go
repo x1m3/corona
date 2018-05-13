@@ -12,8 +12,8 @@ const BLACK = 1
 const WHITE = 2
 
 type MovementsCache interface{
-	Movements(id [64]byte, player int8) ([]tuple, bool)
-	StoreMovements(player int8, id [64]byte, movements []tuple)
+	Movements(id SerializedBoard, player int8) ([]tuple, bool)
+	StoreMovements(player int8, id SerializedBoard, movements []tuple)
 }
 
 type tuple struct {
@@ -27,6 +27,8 @@ type board struct {
 	board  [][]int8
 	movementsCache MovementsCache
 }
+
+type SerializedBoard [64]byte
 
 func NewBoard(width, height int8, cache MovementsCache) *board {
 	b := &board{
@@ -62,7 +64,7 @@ func (b *board) Clone() *board {
 	return newBoard
 }
 
-func (b *board) ID() (id [64]byte) {
+func (b *board) Serialize() (id SerializedBoard) {
 
 	for i := range b.board {
 		for j, val := range b.board[i] {
@@ -73,7 +75,7 @@ func (b *board) ID() (id [64]byte) {
 }
 
 // Please, call Init() first
-func (b *board) RestoreFromID(id [64]byte) {
+func (b *board) Unserialize(id SerializedBoard) {
 	for x := range b.board {
 		for y := range b.board[x] {
 			b.board[x][y] = int8(id[int8(x)*b.Width+int8(y)])
@@ -161,7 +163,7 @@ func (b *board) ComputerMoveMinMax(player int8) ([]tuple, error) {
 
 func (b *board) ValidMovementsForPlayer(player int8) []tuple {
 
-	boardID := b.ID()
+	boardID := b.Serialize()
 
 	if movements, found := b.movementsCache.Movements(boardID, player); found {
 		return movements

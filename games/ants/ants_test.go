@@ -18,7 +18,7 @@ func TestAnts_Init(t *testing.T) {
 			_ = ants
 /*
 			for _, ant := range ants {
-				fmt.Printf("(ant:%d)[%f, %f]  ", ant.ID, ant.X, ant.Y)
+				fmt.Printf("(ant:%d)[%f, %f]  ", ant.Serialize, ant.X, ant.Y)
 			}
 			fmt.Println()
 */

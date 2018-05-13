@@ -350,7 +350,7 @@ func Test_ID_And_RestoreFromID(t *testing.T) {
 				board.board[x][y] = int8(rand.Intn(3))
 			}
 		}
-		otherBoard.RestoreFromID(board.ID())
+		otherBoard.Unserialize(board.Serialize())
 
 		for x:=0; x<8; x++ {
 			for y:=0; y<8; y++ {
