@@ -3,6 +3,7 @@ package othello
 import (
 	"testing"
 	"fmt"
+	"math/rand"
 )
 
 func TestCanMove(t *testing.T) {
@@ -98,7 +99,7 @@ func TestValidMovementsForPlayer(t *testing.T) {
 	board := NewBoard(8, 8)
 	board.Init()
 
-	inArray := func(p *tuple, l []*tuple) bool {
+	inArray := func(p tuple, l []tuple) bool {
 		for _, c := range l {
 			if c.X == p.X && c.Y == p.Y {
 				return true
@@ -107,17 +108,17 @@ func TestValidMovementsForPlayer(t *testing.T) {
 		return false
 	}
 
-	expectedWhites := []*tuple{
-		&tuple{2, 4},
-		&tuple{3, 5},
-		&tuple{4, 2},
-		&tuple{5, 3},
+	expectedWhites := []tuple{
+		tuple{2, 4},
+		tuple{3, 5},
+		tuple{4, 2},
+		tuple{5, 3},
 	}
-	expectedBlacks := []*tuple{
-		&tuple{2, 3},
-		&tuple{3, 2},
-		&tuple{4, 5},
-		&tuple{5, 4},
+	expectedBlacks := []tuple{
+		tuple{2, 3},
+		tuple{3, 2},
+		tuple{4, 5},
+		tuple{5, 4},
 	}
 	whiteMovs := board.ValidMovementsForPlayer(WHITE)
 	for _, mov := range whiteMovs {
@@ -327,8 +328,31 @@ func TestBoard_IsNearEdge(t *testing.T) {
 	}
 }
 
+func Test_ID_And_RestoreFromID(t *testing.T) {
+	board := NewBoard(8, 8)
+	otherBoard := NewBoard(8, 8)
+	board.Init()
+
+	for n := 0; n < 1000000; n++ {
+		for x:=0; x<8; x++ {
+			for y:=0; y<8; y++ {
+				board.board[x][y] = int8(rand.Intn(3))
+			}
+		}
+		otherBoard.RestoreFromID(board.ID())
+
+		for x:=0; x<8; x++ {
+			for y:=0; y<8; y++ {
+				if board.board[x][y] != otherBoard.board[x][y] {
+					t.Fatal("Error recovering board.")
+				}
+			}
+		}
+	}
+}
+
 func TestGame_Ends(t *testing.T) {
-	board := NewBoard(8,8)
+	board := NewBoard(8, 8)
 	board.Init()
 
 	for {
