@@ -76,7 +76,7 @@ func (b *board) Serialize() (id SerializedBoard) {
 			temp |= uint64(val)
 			n += 2
 			if n >= 64 {
-				binary.LittleEndian.PutUint64(id[nn*8:], temp)
+				binary.BigEndian.PutUint64(id[nn*8:], temp)
 				n = 0
 				temp = 0
 				nn++
@@ -97,7 +97,7 @@ func (b *board) Unserialize(id SerializedBoard) {
 	mask = math.MaxUint64
 	mask <<=62
 	for {
-		temp = binary.LittleEndian.Uint64(id[nn*8:])
+		temp = binary.BigEndian.Uint64(id[nn*8:])
 		for n=0; n<64; n+=2 {
 			aux := temp & mask
 			aux >>= 62
@@ -183,7 +183,7 @@ func (b *board) ComputerMoveMinMax(player int8) ([]tuple, error) {
 	for _, movement := range b.ValidMovementsForPlayer(player) {
 		newBoard := b.Clone()
 		newBoard.Move(player, movement.X, movement.Y)
-		score := newBoard.minimax(oppositePlayer, 7, false, math.MinInt64, math.MaxInt64)
+		score := newBoard.minimax(oppositePlayer, 5, false, math.MinInt64, math.MaxInt64)
 		if bestScore < score {
 			bestScore = score
 			bestMovement = movement
