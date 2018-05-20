@@ -37,6 +37,7 @@
                 var chip = game.add.sprite(-50, -50, 'chips');
                 var destinationX = x * deltaX + deltaX / 2 - chip.width / 2;
                 var destinationY = y * deltaY + deltaY / 2 - chip.height / 2;
+                console.log(color);
 
                 chip.frame = color;
                 if (!this.boxes[x][y].isEmpty()) {
@@ -68,7 +69,7 @@
                     this.time.advancedTiming = true;
                     this.stage.disableVisibilityChange = true;
                     this.physics.startSystem(Phaser.Physics.ARCADE);
-                    game.chips = game.load.spritesheet('chips', 'static/img/diamonds32x24x5.png', 32, 24);
+                    game.chips = game.load.spritesheet('chips', 'static/img/chips.png', 80, 80);
                     game.load.image('background', 'static/img/bg.png', 400,400);
                     game.Board = new Board(8, 8);
                     game.stage.backgroundColor = '#3357b2';
