@@ -15,13 +15,11 @@ func (r *ViewPortRequest) Type() int {
 
 type antResponseDTO struct {
 	ID int
+	SC int64 // Score
 	X  float64
 	Y  float64
-/*
-	Vx float64
-	Vy float64
-*/
-	R  float64
+	AV float64 // Angular velocity
+
 }
 
 type ViewportResponse struct {

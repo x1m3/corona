@@ -8,6 +8,7 @@ import (
 	"time"
 	"math"
 	"sync"
+	"log"
 )
 
 type Game struct {
@@ -20,6 +21,14 @@ type Game struct {
 	widthY     float64
 	nAnts      int
 	events     chan pubsub.Event
+	speed      int
+	turboSpeed int
+}
+
+type Cookie struct {
+	Id         int
+	PlayerName string
+	Score      int
 }
 
 func New(widthX, widthY float64, nAnts int) *Game {
@@ -116,19 +125,21 @@ func New(widthX, widthY float64, nAnts int) *Game {
 	body.CreateFixtureFromDef(&fd)
 
 	return &Game{
-		world:    world,
-		fpsSimul: 60,
-		fps:      10,
-		nAnts:    nAnts,
-		widthX:   widthX,
-		widthY:   widthY,
-		events:   make(chan pubsub.Event, 10000),
+		world:      world,
+		fpsSimul:   45,
+		fps:        10,
+		nAnts:      nAnts,
+		widthX:     widthX,
+		widthY:     widthY,
+		events:     make(chan pubsub.Event, 10000),
+		speed:      25,
+		turboSpeed: 40,
 	}
 }
 
 func (g *Game) Init() {
-	g.ants = g.initAnts(g.nAnts, g.widthX, g.widthY)
-	go g.runSimulation(1.0/g.fpsSimul, 8, 3)
+	g.ants = g.initCookies(g.nAnts, g.widthX, g.widthY)
+	go g.runSimulation(time.Duration(time.Second/time.Duration(g.fpsSimul)), 8, 2)
 }
 
 func (g *Game) StartGame() command.Response {
@@ -144,16 +155,15 @@ func (g *Game) ProcessCommand(c command.Request) command.Response {
 		response := ViewportResponse{}
 		response.Ants = make([]antResponseDTO, 0, len(ants))
 		g.worldMutex.RLock()
-		for id, ant := range ants {
+		for _, ant := range ants {
 			pos := ant.GetPosition()
 			response.Ants = append(response.Ants,
 				antResponseDTO{
-					ID: id,
+					ID: ant.GetUserData().(*Cookie).Id,
+					SC: int64(ant.GetUserData().(*Cookie).Score),
 					X:  pos.X,
 					Y:  pos.Y,
-				/*	Vx: ant.GetLinearVelocity().X,
-					Vy: ant.GetLinearVelocity().X,*/
-					R:  ant.GetAngle(),
+					AV: ant.GetAngularVelocity(),
 				})
 		}
 		g.worldMutex.RUnlock()
@@ -172,56 +182,127 @@ func (g *Game) Stop() {
 	panic("implement me")
 }
 
-func (g *Game) initAnts(number int, maxX float64, maxY float64) []*box2d.B2Body {
+func (g *Game) addCookieToWorld(x float64, y float64, info *Cookie) *box2d.B2Body {
+	// Body definition
+	def := box2d.MakeB2BodyDef()
+	def.Position.Set(x, y)
+	def.Type = box2d.B2BodyType.B2_dynamicBody
+	def.FixedRotation = false
+	def.AllowSleep = true
+	def.LinearVelocity = box2d.MakeB2Vec2(float64(rand.Intn(g.speed)-10), float64(rand.Intn(g.speed)-10))
+	def.LinearDamping = 0.0
+	def.AngularDamping = 0.0
+	def.Angle = rand.Float64() * 2 * math.Pi
+	def.AngularVelocity = float64(info.Score / 10)
+
+	// Shape
+	shape := box2d.MakeB2PolygonShape()
+	shape.SetAsBox(math.Sqrt(float64(info.Score)), math.Sqrt(float64(info.Score)))
+
+	// fixture
+	fd := box2d.MakeB2FixtureDef()
+	fd.Shape = &shape
+	fd.Density = math.Sqrt(float64(info.Score))
+	fd.Restitution = 0.5
+	fd.Friction = 1
+
+	// Create body
+	antBody := g.world.CreateBody(&def)
+	antBody.SetUserData(info)
+	antBody.CreateFixtureFromDef(&fd)
+
+	return antBody
+
+}
+
+func (g *Game) initCookies(number int, maxX float64, maxY float64) []*box2d.B2Body {
 	bodies := make([]*box2d.B2Body, 0, number)
 
 	for i := 0; i < number; i++ {
-		// Body definition
-		def := box2d.MakeB2BodyDef()
-		def.Position.Set(maxX*rand.Float64(), maxY*rand.Float64())
-		def.Type = box2d.B2BodyType.B2_dynamicBody
-		def.FixedRotation = false
-		def.AllowSleep = true
-		def.LinearVelocity = box2d.MakeB2Vec2(float64(rand.Intn(20)-10), float64(rand.Intn(20)-10))
-		def.LinearDamping = 0.01
-		def.AngularDamping = 0.3
-		def.Angle = rand.Float64() * 2 * math.Pi
-		def.AngularVelocity = 0.1
-
-		// Create body
-		antBody := g.world.CreateBody(&def)
-
-		antBody.SetUserData(i)
-
-		// Shape
-		//shape := box2d.MakeB2CircleShape()
-		//shape.M_radius = 1.9
-		shape := box2d.MakeB2PolygonShape()
-		shape.SetAsBox(2, 2)
-
-		// fixture
-		fd := box2d.MakeB2FixtureDef()
-		fd.Shape = &shape
-		fd.Density = 10.0
-		fd.Restitution = 0.5
-		fd.Friction = 1
-
-		antBody.CreateFixtureFromDef(&fd)
-		bodies = append(bodies, antBody)
+		cookie := g.addCookieToWorld(maxX*rand.Float64(), maxY*rand.Float64(), &Cookie{Id: i, PlayerName: "manolo", Score: rand.Intn(200) + 20})
+		bodies = append(bodies, cookie)
 	}
 	return bodies
 }
 
-func (g *Game) runSimulation(timeStep float64, velocityIterations int, positionIterations int) {
+func (g *Game) runSimulation(timeStep time.Duration, velocityIterations int, positionIterations int) {
+	timeStep64 := float64(timeStep) / float64(time.Second)
+
+	allMap := box2d.MakeB2AABB()
+	allMap.LowerBound = box2d.MakeB2Vec2(0, 0)
+	allMap.UpperBound = box2d.MakeB2Vec2(g.widthX, g.widthY)
 	for {
+		t1 := time.Now()
+
 		g.worldMutex.Lock()
-		g.world.Step(timeStep, velocityIterations, positionIterations)
+
+		g.adjustSpeeds(&allMap)
+		g.world.Step(timeStep64, velocityIterations, positionIterations)
+
 		g.worldMutex.Unlock()
 
-		// TODO: Avoid this timer using a ticker
-		time.Sleep(time.Duration(timeStep * float64(time.Second)))
-
+		elapsed := time.Since(t1)
+		if elapsed < timeStep {
+			time.Sleep(timeStep - elapsed)
+		} else {
+			log.Printf("WARNING: Cannot sustain frame rate. Expected time <%v>. Real time <%v>", timeStep, elapsed)
+		}
 	}
+}
+
+func (g *Game) adjustSpeeds(allMap *box2d.B2AABB) {
+
+	g.world.QueryAABB(
+		func(fixture *box2d.B2Fixture) bool {
+			body := fixture.M_body
+			info := body.GetUserData()
+
+			switch info.(type) {
+			case *Cookie:
+				// Angular speed
+				currentSpeed := body.M_angularVelocity
+				expectedSpeed := float64(info.(*Cookie).Score / 10)
+
+				var linearSpeedPenalty float64 = 0
+
+				if currentSpeed <= 0 {
+					body.SetAngularVelocity(currentSpeed + (expectedSpeed+math.Abs(currentSpeed))/50)
+				} else {
+					if currentSpeed < expectedSpeed {
+						body.SetAngularVelocity(currentSpeed + (expectedSpeed-currentSpeed)/50)
+					} else {
+						body.SetAngularVelocity(currentSpeed - (currentSpeed-expectedSpeed)/50)
+					}
+					linearSpeedPenalty = currentSpeed / expectedSpeed /// Could be positive if it is spinning faster ;-)
+				}
+
+				// Linear speed, based on configuration, but also on spining angular speed.
+				speedX := body.GetLinearVelocity().X
+				speedY := body.GetLinearVelocity().Y
+				if math.Abs(speedX) < 1.0 {
+					speedX = 1.0
+				}
+				if math.Abs(speedY) < 1.0 {
+					speedY = 1.0
+				}
+				currentSpeed = math.Sqrt(math.Pow(speedX, 2) + math.Pow(speedY, 2))
+				expectedSpeed = linearSpeedPenalty * float64(g.speed)
+
+				offsetX := speedX / 20
+				offsetY := speedY / 20
+
+				if currentSpeed < expectedSpeed {
+					body.SetLinearVelocity(box2d.MakeB2Vec2(speedX+offsetX, speedY+offsetY))
+				} else {
+					body.SetLinearVelocity(box2d.MakeB2Vec2(speedX-offsetX, speedY-offsetY))
+				}
+
+			}
+			return true
+		},
+		*allMap,
+	)
+
 }
 
 func (g *Game) viewPort(x, y, xx, yy float64) map[int]*box2d.B2Body {
@@ -231,7 +312,12 @@ func (g *Game) viewPort(x, y, xx, yy float64) map[int]*box2d.B2Body {
 	ants := make(map[int]*box2d.B2Body, 0)
 
 	callback := func(fixture *box2d.B2Fixture) bool {
-		ants[fixture.M_body.GetUserData().(int)] = fixture.M_body
+		info := fixture.M_body.GetUserData()
+		switch info.(type) {
+		case *Cookie:
+			ants[info.(*Cookie).Id] = fixture.M_body
+		}
+
 		return true
 	}
 

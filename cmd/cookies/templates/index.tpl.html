@@ -7,6 +7,8 @@
     <script src="https://cdn.jsdelivr.net/phaser/2.6.1/phaser.min.js"></script>
 </head>
 <body>
+<div id="gameArea"></div>
+
 
 <script>
     var ants = new Map();
@@ -21,7 +23,7 @@
     var efectiveUpdatePeriod = 0;
 
     $(document).ready(function () {
-        game = new Phaser.Game(canvas_width, canvas_height, Phaser.AUTO);
+        game = new Phaser.Game(canvas_width, canvas_height, Phaser.CANVAS, 'gameArea');
         gameBootstrapper.init();
     });
 
@@ -31,41 +33,26 @@
         updateClientPeriod:{{.UpdateClientPeriod}},
         pixels2Meters:{{.PixelsToMeters}}
     };
+
+    var zoomFactor = 0.8;
     var main = function (game) {
-
-        setInterval(function () {
-            var visibleAnts = 0;
-            var quietAnts = 0;
-            var inCamera = 0;
-            var count = 0;
-
-            ants.forEach(function (ant) {
-                if (ant.ant.visible) visibleAnts++;
-                if (ant.ant.speed === 0) quietAnts++;
-                if (ant.ant.inCamera) inCamera++;
-                count++;
-            });
-            console.log(
-                    game.time.fps + " fps. ",
-                    game.time.ups + " ups",
-                    visibleAnts + " visible, ",
-                    quietAnts + " quiet, ",
-                    inCamera + " inCamera, ",
-                    efectiveUpdatePeriod + "ms efectiveupdateperiod, ",
-                    count + ' ants map size.'
-            );
-        }, 1000);
-
     };
 
     main.prototype = {
         preload: function () {
+
             game.scale.scaleMode = Phaser.ScaleManager.RESIZE;
             game.world.setBounds(0, 0, meters2Pixels(gameProperties.gameWidthMeters), meters2Pixels(gameProperties.gameHeightMeters), false, false, false, false);
             game.time.desiredFps = 48;
             game.time.advancedTiming = true
             game.stage.disableVisibilityChange = true;
             game.physics.startSystem(Phaser.Physics.ARCADE);
+            game.load.image("background", "/static/img/bg1.png");
+            game.load.image("cookie1", "/static/img/spinner1.png");
+            game.load.image("cookie2", "/static/img/spinner2.png");
+            game.load.image("cookie3", "/static/img/spinner3.png");
+            game.load.image("firefox", "/static/img/firefox.png");
+            game.scale.compatibility.scrollTo = false;
 
         },
         //this function is fired once when we load the game
@@ -79,7 +66,7 @@
             }, 100);
         },
         update: function () {
-            updateCamera(game, pointer);
+            updateCamera(game);
         }
     };
 
@@ -89,20 +76,20 @@
 
             var ant = antInfo.ant;
             if (ant === null) {
-                ant = game.add.graphics(antInfo.X, antInfo.Y);
-                ant.anchor.setTo(0.5, 0.5);
-
-                ant.beginFill(Math.random() * 0x888888 + 0x888888, 1);
-                ant.drawRect(meters2Pixels(-2), meters2Pixels(-2), meters2Pixels(4), meters2Pixels(4));
-                ant.endFill();
+                ant = game.add.sprite(antInfo.X, antInfo.Y, "firefox");
                 ant.alpha = 0;
+                //ant.tint = Math.random() * 0xffffff;
+                ant.anchor.setTo(0.5, 0.5);
+                ant.width = meters2Pixels(1.3 * 2 * Math.sqrt(antInfo.Score));
+                ant.height = meters2Pixels(1.3 * 2 * Math.sqrt(antInfo.Score));
+                ant.maxAngular = 100000;
+                ant.angularDrag = 0;
+
 
                 game.add.tween(ant).to({alpha: 1}, 500, Phaser.Easing.None, true);
 
-
                 game.physics.enable(ant, Phaser.Physics.ARCADE);
                 ant.body.allowRotation = true;
-                ant.body.angle = antInfo.Angle;
 
 
                 antInfo.ant = ant;
@@ -118,7 +105,8 @@
                     ant.velocity = new Phaser.Point(0, 0);
                     ant.visible = true;
                 }
-                ant.angle = antInfo.Angle;
+                ant.body.angularVelocity = 10 * antInfo.AV;
+                console.log(ant.body.angularVelocity, 10 * antInfo.AV, ant.body.angularVelocity / 360)
             } else {
                 ant.visible = false;
                 ant.body.destroy();
@@ -129,45 +117,50 @@
 
 
     function createBackground(game) {
-        game.stage.backgroundColor = 0x000020;
-        for (var i = 0; i < 500; i++) {
-            var star = game.add.graphics(Math.floor(Math.random() * meters2Pixels(gameProperties.gameWidthMeters)), Math.floor(Math.random() * meters2Pixels(gameProperties.gameHeightMeters)));
-            star.radius = Math.floor(Math.random() * 10);
-            star.beginFill(0x505070);
-            star.drawCircle(0, 0, star.radius * 2);
-            star.endFill();
-            star.anchor.setTo(0, 0);
-            star.body_size = star.radius;
-            star.alpha = 0;
-            game.add.tween(star).to( { "alpha":1 }, 3000 + Math.random()*3000, Phaser.Easing.Linear.None, true, 0, -1, true);
+        var width = meters2Pixels(gameProperties.gameWidthMeters);
+        var height = meters2Pixels(gameProperties.gameHeightMeters);
+        bg = game.add.tileSprite(0, 0, width, height, 'background');
 
-
-
-        }
     }
 
     function createCamera(game) {
-        pointer = game.add.graphics(meters2Pixels(gameProperties.gameWidthMeters / 2), meters2Pixels(gameProperties.gameHeightMeters / 2));
-        pointer.radius = 10;
-        pointer.anchor.setTo(1, 0.5);
-        pointer.body_size = pointer.radius;
-        game.physics.enable(pointer, Phaser.Physics.ARCADE);
-        pointer.body.fixedRotation = true;
 
-        game.camera.follow(pointer, Phaser.Camera.FOLLOW_LOCKON, 0.5, 0.5);
+        var cameraFocusX = 100;
+        var cameraFocusY = 200;
+
+        game.world.scale.setTo(this.zoomFactor);
+        game.camera.focusOnXY(cameraFocusX * game.world.scale.x, cameraFocusY * game.world.scale.y);
 
     }
 
-    function updateCamera(game, pointer) {
-        var distance2pointer = game.physics.arcade.distanceToPointer(pointer);
-        if (distance2pointer > pointer.radius * 2) {
-            var speed = distance2pointer > meters2Pixels(400) ? meters2Pixels(400) : distance2pointer;
-            if (game.input.mousePointer.isDown) {
-                speed = meters2Pixels(500);
-            }
-            game.physics.arcade.moveToPointer(pointer, speed, game.input.activePointer);
+    function updateCamera(game) {
+
+
+        if (this.game.input.activePointer.isDown) {
+            this.game.camera.y -= this.game.input.mouse.event.movementY;
+            this.game.camera.x -= this.game.input.mouse.event.movementX;
         }
+
+        if (this.zoomFactor>0.2) {
+            this.zoomFactor -= 0.001;
+            game.world.scale.setTo(this.zoomFactor);
+        }
+
+
+
+
+        /*
+                var distance2pointer = game.physics.arcade.distanceToPointer(pointer);
+                if (distance2pointer > pointer.radius * 2) {
+                    var speed = distance2pointer > meters2Pixels(400) ? meters2Pixels(400) : distance2pointer;
+                    if (game.input.mousePointer.isDown) {
+                        speed = meters2Pixels(500);
+                    }
+                    game.physics.arcade.moveToPointer(pointer, speed, game.input.activePointer);
+                }
+                */
     }
+
 
     function refreshAntsPosition(positions) {
 
@@ -183,12 +176,11 @@
             }
             ants.set(newPosition.ID, {
                 ant: ant,
+                Score: newPosition.SC,
                 X: meters2Pixels(newPosition.X),
                 Y: meters2Pixels(newPosition.Y),
-                /*Vx: meters2Pixels(newPosition.Vx),
-                Vy: meters2Pixels(newPosition.Vy),*/
-                Angle: newPosition.R * 180 / Math.PI,
-                visible: true
+                visible: true,
+                AV: newPosition.AV * 180 / Math.PI
             });
         });
     }
@@ -232,10 +224,10 @@
         msg = {
             t: "v",
             d: {
-                x: 0.95 * pixels2Meters(cam.x),
-                y: 0.95 * pixels2Meters(cam.y),
-                xx: 1.05 * pixels2Meters(cam.x + cam.width),
-                yy: 1.05 * pixels2Meters(cam.y + cam.height)
+                x: 0.95 * pixels2Meters(cam.x / game.world.scale.x),
+                y: 0.95 * pixels2Meters(cam.y / game.world.scale.y),
+                xx: 1.05 * pixels2Meters((cam.x + cam.width) / game.world.scale.x),
+                yy: 1.05 * pixels2Meters((cam.y + cam.height) / game.world.scale.y),
             }
         };
         if (conn.readyState === conn.OPEN) {

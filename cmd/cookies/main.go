@@ -16,9 +16,9 @@ import (
 const (
 	UpcateClientPeriod = 100 * time.Millisecond
 	PixelsToMeters     = 10
-	GameWidth          = 300
-	GameHeight         = 300
-	NAnts              = 2000
+	GameWidth          = 2000
+	GameHeight         = 2000
+	NAnts              = 200
 )
 
 const virtualHost = ""
