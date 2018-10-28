@@ -10,55 +10,31 @@ import (
 	"github.com/gorilla/websocket"
 	"log"
 	"sync"
-	"github.com/x1m3/elixir/games/ants"
+	"github.com/x1m3/elixir/games/cookies"
+	"github.com/nu7hatch/gouuid"
 )
 
 const (
-	UpcateClientPeriod = 100 * time.Millisecond
-	PixelsToMeters     = 10
-	GameWidth          = 2000
-	GameHeight         = 2000
-	NAnts              = 200
+	updateClientPeriod         = 100 * time.Millisecond
+	pixels2Meters              = 10
+	gameWidthMeters            = 2000
+	gameHeightMeters           = 2000
+	NumCookies                 = 200
+	virtualHost                = ""
+	port                       = 8000
+	serverHTTPReadTimeOut      = 30 * time.Second // Maximum time to read the full http request
+	serverHTTPWriteTimeout     = 30 * time.Second // Maximum time to write the full http request
+	serverHTTPKeepAliveTimeout = 5 * time.Second  // Keep alive timeout. Time to close an idle connection if keep alive is enable
 )
 
-const virtualHost = ""
-const port = 8000
-
-// Maximum time to read the full http request
-const SERVER_HTTP_READTIMEOUT = 30 * time.Second
-
-// Maximum time to write the full http request
-const SERVER_HTTP_WRITETIMEOUT = 30 * time.Second
-
-// Keep alive timeout. Time to close an idle connection if keep alive is enable
-const SERVER_HTTP_IDLETIMEOUT = 5 * time.Second
-
-type GameSession struct {
-	sync.RWMutex
-	viewportX  float64
-	viewportY  float64
-	viewportXX float64
-	viewportYY float64
-}
-
-func (s *GameSession) SetViewport(x, y, xx, yy float64) {
-	s.Lock()
-	s.viewportX, s.viewportY, s.viewportXX, s.viewportYY = x, y, xx, yy
-	s.Unlock()
-
-}
-func (s *GameSession) GetViewport() (float64, float64, float64, float64) {
-	s.RLock()
-	defer s.RUnlock()
-	return s.viewportX, s.viewportY, s.viewportXX, s.viewportYY
-}
-
-type GameSessions map[*websocket.Conn]*GameSession
-
-var gSessions GameSessions
-var game *ants.Game
+var game *cookies.Game
+var wsSessions map[*websocket.Conn]uuid.UUID
+var wsSessionsMutex sync.RWMutex
 
 func main() {
+
+	game = cookies.New(gameWidthMeters, gameHeightMeters, NumCookies)
+	wsSessions = make(map[*websocket.Conn]uuid.UUID)
 
 	router := &mux.Router{}
 	router.NotFoundHandler = func() http.HandlerFunc {
@@ -75,14 +51,10 @@ func main() {
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", virtualHost, port),
 		Handler:      router,
-		ReadTimeout:  SERVER_HTTP_READTIMEOUT,
-		WriteTimeout: SERVER_HTTP_WRITETIMEOUT,
-		IdleTimeout:  SERVER_HTTP_IDLETIMEOUT,
+		ReadTimeout:  serverHTTPReadTimeOut,
+		WriteTimeout: serverHTTPWriteTimeout,
+		IdleTimeout:  serverHTTPKeepAliveTimeout,
 	}
-
-	gSessions = make(map[*websocket.Conn]*GameSession)
-
-	game = ants.New(GameWidth, GameHeight, NAnts)
 
 	go game.Init()
 
@@ -106,10 +78,10 @@ func indexAction(resp http.ResponseWriter, req *http.Request) {
 		GameWidth          int
 		GameHeight         int
 	}{
-		UpdateClientPeriod: float64(UpcateClientPeriod) / float64(time.Second),
-		PixelsToMeters:     PixelsToMeters,
-		GameWidth:          GameWidth,
-		GameHeight:         GameHeight,
+		UpdateClientPeriod: float64(updateClientPeriod) / float64(time.Second),
+		PixelsToMeters:     pixels2Meters,
+		GameWidth:          gameWidthMeters,
+		GameHeight:         gameHeightMeters,
 	}
 
 	index.Execute(resp, &tplData)
@@ -126,53 +98,53 @@ func wsAction(resp http.ResponseWriter, req *http.Request) {
 		log.Println(err)
 		return
 	}
-	session := &GameSession{
-		viewportX: 0,
-		viewportY: 0,
-	}
 
-	gSessions[conn] = session
+	sessionID := game.NewSession()
+	wsSessionsMutex.Lock()
+	wsSessions[conn]= sessionID
+	wsSessionsMutex.Unlock()
 
-	go handleWSRequest(conn)
-	go sendAnts(conn, UpcateClientPeriod)
+	go handleWSRequests(conn, sessionID)
+
+	go manageRemoteView(conn, sessionID, updateClientPeriod)
+
 	log.Println("New Connection")
 }
 
-func sendAnts(conn *websocket.Conn, updatePeriod time.Duration) {
-	var request ants.ViewPortRequest
-	session := gSessions[conn]
+func manageRemoteView(conn *websocket.Conn, sessionID uuid.UUID, updatePeriod time.Duration) {
+
 	for {
-		// TODO: Avoid this timer implementing a ticker
 		time.Sleep(updatePeriod)
-		request.X, request.Y, request.XX, request.YY = session.GetViewport()
-		ants := game.ProcessCommand(&request).(*ants.ViewportResponse).Ants
-		err := conn.WriteJSON(ants)
+		req := game.ViewPortRequest(sessionID)
+
+		err := conn.WriteJSON(req)
 		if err != nil {
 			log.Println("Socket broken while writing. Closing connection")
 			conn.Close()
 			return
 		}
 	}
+
 }
 
-func handleWSRequest(conn *websocket.Conn) {
+func handleWSRequests(conn *websocket.Conn, sessionID uuid.UUID) {
 	for {
 		m := make(map[string]interface{})
-
+		conn.ReadMessage()
 		err := conn.ReadJSON(&m)
 		if err != nil {
 			log.Printf("Socket broken while reading. Closing connection: <%s>\n", err)
 			conn.Close()
 			return
 		}
+		// TODO: Verify that sessionID provided by client is the same that we have in memory
+
 		switch m["t"] {
 		case "v":
 			viewport := m["d"].(map[string]interface{})
-			session := gSessions[conn]
-			session.SetViewport(viewport["x"].(float64), viewport["y"].(float64), viewport["xx"].(float64), viewport["yy"].(float64))
+			game.UpdateViewPortRequest(sessionID, viewport["x"].(float64), viewport["y"].(float64), viewport["xx"].(float64), viewport["yy"].(float64))
 		default:
 			log.Printf("got unknown message type <%v>", m)
 		}
-
 	}
 }
