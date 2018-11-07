@@ -1,33 +1,53 @@
 package cookies
 
+type msgType int8
+
+const (
+	ViewPortRequestType  = 1
+	ViewPortResponseType = 2
+	UserJoinRequestType  = 3
+)
+
+type Message interface {
+	GetType() msgType
+	SetType(msgType)
+}
+
+type BaseMessage struct {
+	Type msgType `json:"t"`
+}
+
+func (m *BaseMessage) GetType() msgType {
+	return m.Type
+}
+
+func (m *BaseMessage) SetType(t msgType) {
+	m.Type = t
+}
+
 type ViewPortRequest struct {
+	BaseMessage
 	X  float64
 	Y  float64
 	XX float64
 	YY float64
 }
 
-func (r *ViewPortRequest) Request() {}
-
-func (r *ViewPortRequest) Type() int {
-	return 1
-}
-
-type antResponseDTO struct {
-	ID int
-	SC int64 // Score
-	X  float64
-	Y  float64
-	AV float64 // Angular velocity
-
-}
-
 type ViewportResponse struct {
-	Ants []antResponseDTO
+	BaseMessage
+	Ants []CookieInfoResponse
 }
 
-func (r *ViewportResponse) Response() {}
+type CookieInfoResponse struct {
+	BaseMessage
+	ID              int
+	Score           int     `json:"SC"`
+	X               float64 `json:"X"`
+	Y               float64 `json:"Y"`
+	AngularVelocity float64 `json:"AV"`
+}
 
-func (r *ViewportResponse) Type() int {
-	return 2
+type UserJoinRequest struct {
+	BaseMessage
+	Username string `json:"UN"`
 }

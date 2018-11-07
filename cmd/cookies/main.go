@@ -12,6 +12,9 @@ import (
 	"sync"
 	"github.com/x1m3/elixir/games/cookies"
 	"github.com/nu7hatch/gouuid"
+	"encoding/json"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/x1m3/elixir/games/command"
 )
 
 const (
@@ -101,7 +104,7 @@ func wsAction(resp http.ResponseWriter, req *http.Request) {
 
 	sessionID := game.NewSession()
 	wsSessionsMutex.Lock()
-	wsSessions[conn]= sessionID
+	wsSessions[conn] = sessionID
 	wsSessionsMutex.Unlock()
 
 	go handleWSRequests(conn, sessionID)
@@ -128,23 +131,53 @@ func manageRemoteView(conn *websocket.Conn, sessionID uuid.UUID, updatePeriod ti
 }
 
 func handleWSRequests(conn *websocket.Conn, sessionID uuid.UUID) {
+
+	req := cookies.Message{}
 	for {
-		m := make(map[string]interface{})
-		conn.ReadMessage()
-		err := conn.ReadJSON(&m)
+
+		// Reading the message
+		t, data, err := conn.ReadMessage()
 		if err != nil {
-			log.Printf("Socket broken while reading. Closing connection: <%s>\n", err)
+			log.Printf("Error reading message: <%s>", err)
 			conn.Close()
 			return
 		}
-		// TODO: Verify that sessionID provided by client is the same that we have in memory
+		if t != websocket.TextMessage && t != websocket.BinaryMessage {
+			continue
+		}
 
-		switch m["t"] {
-		case "v":
-			viewport := m["d"].(map[string]interface{})
-			game.UpdateViewPortRequest(sessionID, viewport["x"].(float64), viewport["y"].(float64), viewport["xx"].(float64), viewport["yy"].(float64))
+		if err := json.Unmarshal(data, &req); err != nil {
+			log.Printf("Error parsing message: <%s>", err)
+			conn.Close()
+			return
+		}
+
+		switch req.Type {
+		case "v": // viewportRequest
+			viewPortRequest := &cookies.ViewPortRequest{}
+			if err := json.Unmarshal(req.Data, viewPortRequest); err != nil {
+				if err := conn.WriteJSON(nil); err != nil {
+					log.Printf("ViewportRequest bad request <%s>", err)
+				}
+			}
+			game.UpdateViewPortRequest(sessionID, viewPortRequest)
+
+		case "j": // join user
+			userDataRequest := &cookies.UserJoinRequest{}
+			if err := json.Unmarshal(req.Data, userDataRequest); err != nil {
+				if err := conn.WriteJSON(nil); err != nil {
+					log.Printf("UserJoin Bad Request <%s>", err)
+				}
+			}
+			spew.Dump(userDataRequest)
+
+			if err := conn.WriteJSON(game.UserJoin(sessionID, userDataRequest)); err != nil {
+				log.Printf("UserJoin error: <%s>", err)
+			}
+
 		default:
-			log.Printf("got unknown message type <%v>", m)
+			log.Printf("got unknown message type <%v>", req)
 		}
 	}
 }
+

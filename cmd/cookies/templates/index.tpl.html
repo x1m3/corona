@@ -12,14 +12,14 @@
 
 
 <script>
-    var ants = new Map();
+    var cookies = new Map();
 </script>
 
 <script>
 
     var canvas_width = window.innerWidth * window.devicePixelRatio;
     var canvas_height = window.innerHeight * window.devicePixelRatio;
-    var conn = null;
+    var network = null;
     var lastUpdate = Date.now();
     var efectiveUpdatePeriod = 0;
 
@@ -37,6 +37,7 @@
 
     var zoomFactor = 0.8;
     var main = function (game) {
+
     };
 
     main.prototype = {
@@ -65,10 +66,12 @@
             createBackground(game);
             createCamera(game);
 
+            network = initNetwork();
 
-            conn = initWS();
+            //sendUserJoin("manolito", network);
+
             setInterval(function () {
-                sendViewPort(game, conn)
+                sendViewPort(game, network)
             }, 100);
         },
         update: function () {
@@ -76,15 +79,14 @@
         }
     };
 
-    function updateAnts(game) {
+    function updateCookies(game) {
 
-        ants.forEach(function (antInfo, key, map) {
+        cookies.forEach(function (antInfo, key, map) {
 
             var ant = antInfo.ant;
             if (ant === null) {
                 ant = game.add.sprite(antInfo.X, antInfo.Y, "firefox");
                 ant.alpha = 0;
-                //ant.tint = Math.random() * 0xffffff;
                 ant.anchor.setTo(0.5, 0.5);
                 ant.width = meters2Pixels(1.3 * 2 * Math.sqrt(antInfo.Score));
                 ant.height = meters2Pixels(1.3 * 2 * Math.sqrt(antInfo.Score));
@@ -92,7 +94,7 @@
                 ant.angularDrag = 0;
 
                 var filter = game.add.filter('Gray');
-                filter.blur = 0.05*antInfo.Score;
+                filter.blur = 0.05 * antInfo.Score;
 
 
                 //ant.filters = [filter];
@@ -118,9 +120,8 @@
                     ant.visible = true;
                 }
 
-
                 ant.body.angularVelocity = 10 * antInfo.AV;
-                //console.log(ant.body.angularVelocity, 10 * antInfo.AV, ant.body.angularVelocity / 360)
+
             } else {
                 ant.visible = false;
                 ant.body.destroy();
@@ -154,38 +155,29 @@
             this.game.camera.x -= this.game.input.mouse.event.movementX;
         }
 
+        /*
         if (this.zoomFactor > 0.2) {
             this.zoomFactor -= 0.001;
             game.world.scale.setTo(this.zoomFactor);
         }
+        */
 
 
-        /*
-                var distance2pointer = game.physics.arcade.distanceToPointer(pointer);
-                if (distance2pointer > pointer.radius * 2) {
-                    var speed = distance2pointer > meters2Pixels(400) ? meters2Pixels(400) : distance2pointer;
-                    if (game.input.mousePointer.isDown) {
-                        speed = meters2Pixels(500);
-                    }
-                    game.physics.arcade.moveToPointer(pointer, speed, game.input.activePointer);
-                }
-                */
     }
-
 
     function refreshAntsPosition(positions) {
 
-        ants.forEach(function (ant) {
+        cookies.forEach(function (ant) {
             ant.visible = false
         });
 
         positions.Ants.forEach(function (newPosition) {
             var ant = null;
-            var previous = ants.get(newPosition.ID);
+            var previous = cookies.get(newPosition.ID);
             if (previous) {
                 ant = previous.ant;
             }
-            ants.set(newPosition.ID, {
+            cookies.set(newPosition.ID, {
                 ant: ant,
                 Score: newPosition.SC,
                 X: meters2Pixels(newPosition.X),
@@ -204,12 +196,12 @@
         }
     };
 
-    function initWS() {
+    function initNetwork() {
         var socket = new WebSocket("ws://" + window.location.host + "/ws/");
         socket.onopen = function () {
             console.log("Socket is open");
             setInterval(function () {
-                updateAnts(game);
+                updateCookies(game);
             }, 1000 * gameProperties.updateClientPeriod);
 
         };
@@ -229,11 +221,11 @@
         return socket;
     }
 
-    function sendViewPort(game, conn) {
-        cam = game.camera;
-        zoom = 1.2;
+    function sendViewPort(game, network) {
+        var cam = game.camera;
+        var zoom = 1.2;
 
-        msg = {
+        var msg = {
             t: "v",
             d: {
                 x: 0.95 * pixels2Meters(cam.x / game.world.scale.x),
@@ -242,8 +234,21 @@
                 yy: 1.05 * pixels2Meters((cam.y + cam.height) / game.world.scale.y),
             }
         };
-        if (conn.readyState === conn.OPEN) {
-            conn.send(JSON.stringify(msg))
+        if (network.readyState === network.OPEN) {
+            network.send(JSON.stringify(msg))
+        }
+    }
+
+    // TODO: Falla porque la red no está abierta aun
+    function sendUserJoin(username, network) {
+        var msg = {
+            t: "j",
+            d: {
+                "UN" : username
+            }
+        };
+        if (network.readyState === network.OPEN) {
+            network.send(JSON.stringify(msg))
         }
     }
 

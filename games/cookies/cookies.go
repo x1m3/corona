@@ -55,6 +55,51 @@ func (g *Game) Init() {
 	go g.runSimulation(time.Duration(time.Second/time.Duration(g.fpsSimul)), 8, 2)
 }
 
+func (g *Game) NewSession() uuid.UUID {
+	return g.gSessions.add()
+}
+
+func (g *Game) UserJoin(sessionID uuid.UUID, req *UserJoinRequest) *CookieInfoResponse {
+
+	c := &Cookie{Id: rand.Int(), PlayerName: req.Username, Score: 100}
+	x := float64(100 + rand.Intn(int(g.widthX-100)))
+	y := float64(100 + rand.Intn(int(g.widthY-100)))
+	g.addCookieToWorld(x, y, c)
+
+	return &CookieInfoResponse{ID: c.Id, Score: c.Score, X: x, Y: y}
+}
+
+func (g *Game) ViewPortRequest(sessionID uuid.UUID) *ViewportResponse {
+
+	cookies := g.viewPort(g.gSessions.viewPortRequest(sessionID))
+
+	response := ViewportResponse{}
+
+	response.Ants = make([]CookieInfoResponse, 0, len(cookies))
+	g.worldMutex.RLock()
+	for _, ant := range cookies {
+		pos := ant.GetPosition()
+		response.Ants = append(response.Ants,
+			CookieInfoResponse{
+				ID:              ant.GetUserData().(*Cookie).Id,
+				Score:           ant.GetUserData().(*Cookie).Score,
+				X:               pos.X,
+				Y:               pos.Y,
+				AngularVelocity: ant.GetAngularVelocity(),
+			})
+	}
+	g.worldMutex.RUnlock()
+	return &response
+}
+
+func (g *Game) UpdateViewPortRequest(sessionID uuid.UUID, req *ViewPortRequest) {
+	g.gSessions.UpdateViewPort(sessionID, req.X, req.Y, req.XX, req.YY)
+}
+
+func (g *Game) EventListener() <-chan pubsub.Event {
+	return g.events
+}
+
 func (g *Game) createWorld() {
 
 	createWorldBoundary := func(world *box2d.B2World, centerX, centerY, widthX, widthY float64, horiz bool) {
@@ -90,41 +135,6 @@ func (g *Game) createWorld() {
 
 	g.initCookies(g.nAnts, g.widthX, g.widthY)
 
-}
-
-func (g *Game) NewSession() uuid.UUID {
-	return g.gSessions.add()
-}
-
-func (g *Game) ViewPortRequest(sessionID uuid.UUID) *ViewportResponse {
-
-	cookies := g.viewPort(g.gSessions.viewPortRequest(sessionID))
-
-	response := ViewportResponse{}
-
-	response.Ants = make([]antResponseDTO, 0, len(cookies))
-	g.worldMutex.RLock()
-	for _, ant := range cookies {
-		pos := ant.GetPosition()
-		response.Ants = append(response.Ants,
-			antResponseDTO{
-				ID: ant.GetUserData().(*Cookie).Id,
-				SC: int64(ant.GetUserData().(*Cookie).Score),
-				X:  pos.X,
-				Y:  pos.Y,
-				AV: ant.GetAngularVelocity(),
-			})
-	}
-	g.worldMutex.RUnlock()
-	return &response
-}
-
-func (g *Game) UpdateViewPortRequest(sessionID uuid.UUID, x float64, y float64, xx float64, yy float64) {
-	g.gSessions.UpdateViewPort(sessionID, x, y, xx, yy)
-}
-
-func (g *Game) EventListener() <-chan pubsub.Event {
-	return g.events
 }
 
 func (g *Game) addCookieToWorld(x float64, y float64, info *Cookie) *box2d.B2Body {
