@@ -3,15 +3,25 @@ package cookies
 import (
 	"fmt"
 	"github.com/x1m3/elixir/games/cookies/codec"
+	"github.com/gorilla/websocket"
 )
 
 type Transport struct {
+	conn *websocket.Conn
 	e codec.MarshalUnmarshaler
 }
 
-func NewTransport(e codec.MarshalUnmarshaler) *Transport {
+func NewTransport(e codec.MarshalUnmarshaler, c *websocket.Conn) *Transport {
 
-	return &Transport{e: e}
+	return &Transport{e: e, conn: c}
+}
+
+func(t *Transport) Send(data Message) error {
+	panic("implement me")
+}
+
+func(t *Transport) Receive() (Message, error) {
+	panic("implement me")
 }
 
 func (t *Transport) Marshal(data Message) ([]byte, error) {
