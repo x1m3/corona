@@ -260,7 +260,7 @@ func (g *Game) adjustSpeeds(allMap *box2d.B2AABB) {
 
 }
 
-func (g *Game) viewPort(x, y, xx, yy float64) map[int]*box2d.B2Body {
+func (g *Game) viewPort(x, y, xx, yy float32) map[int]*box2d.B2Body {
 
 	cookies := make(map[int]*box2d.B2Body, 0)
 
@@ -275,7 +275,7 @@ func (g *Game) viewPort(x, y, xx, yy float64) map[int]*box2d.B2Body {
 			}
 			return true
 		},
-		box2d.B2AABB{LowerBound: box2d.MakeB2Vec2(x, y), UpperBound: box2d.MakeB2Vec2(xx, yy)},
+		box2d.B2AABB{LowerBound: box2d.MakeB2Vec2(float64(x), float64(y)), UpperBound: box2d.MakeB2Vec2(float64(xx), float64(yy))},
 	)
 
 	g.worldMutex.RUnlock()

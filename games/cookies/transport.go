@@ -2,29 +2,14 @@ package cookies
 
 import (
 	"fmt"
-	"encoding/json"
+	"github.com/x1m3/elixir/games/cookies/codec"
 )
 
-type Encoder interface {
-	Marshal(v interface{}) ([]byte, error)
-	Unmarshal(data []byte, v interface{}) error
-}
-
-type JSONEncoder struct{}
-
-func (e *JSONEncoder) Marshal(v interface{}) ([]byte, error) {
-	return json.Marshal(v)
-}
-
-func (e *JSONEncoder) Unmarshal(data []byte, v interface{}) error {
-	return json.Unmarshal(data, v)
-}
-
 type Transport struct {
-	e Encoder
+	e codec.MarshalUnmarshaler
 }
 
-func NewTransport(e Encoder) *Transport {
+func NewTransport(e codec.MarshalUnmarshaler) *Transport {
 
 	return &Transport{e: e}
 }

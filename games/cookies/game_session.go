@@ -7,17 +7,17 @@ import (
 
 type gameSession struct {
 	ID         uuid.UUID
-	viewportX  float64
-	viewportY  float64
-	viewportXX float64
-	viewportYY float64
+	viewportX  float32
+	viewportY  float32
+	viewportXX float32
+	viewportYY float32
 }
 
-func (s *gameSession) viewPortRequest() (float64, float64, float64, float64) {
+func (s *gameSession) viewPortRequest() (float32, float32, float32, float32) {
 	return s.viewportX, s.viewportY, s.viewportXX, s.viewportYY
 }
 
-func (s *gameSession) updateViewPort(x float64, y float64, xx float64, yy float64) {
+func (s *gameSession) updateViewPort(x float32, y float32, xx float32, yy float32) {
 	s.viewportX, s.viewportY, s.viewportXX, s.viewportYY = x, y, xx, yy
 }
 
@@ -40,13 +40,13 @@ func (s *gameSessions) add() uuid.UUID {
 	return *ID
 }
 
-func (s *gameSessions) viewPortRequest(ID uuid.UUID) (float64, float64, float64, float64) {
+func (s *gameSessions) viewPortRequest(ID uuid.UUID) (float32, float32, float32, float32) {
 	s.RLock()
 	defer s.RUnlock()
 	return s.sessions[ID].viewPortRequest()
 }
 
-func (s *gameSessions) UpdateViewPort(ID uuid.UUID, x float64, y float64, xx float64, yy float64) {
+func (s *gameSessions) UpdateViewPort(ID uuid.UUID, x float32, y float32, xx float32, yy float32) {
 	s.Lock()
 	s.sessions[ID].updateViewPort(x, y, xx, yy)
 	s.Unlock()

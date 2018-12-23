@@ -27,10 +27,10 @@ func (m *BaseMessage) SetType(t msgType) {
 
 type ViewPortRequest struct {
 	BaseMessage
-	X  float64
-	Y  float64
-	XX float64
-	YY float64
+	X  float32
+	Y  float32
+	XX float32
+	YY float32
 }
 
 type ViewportResponse struct {
