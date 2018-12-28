@@ -3,14 +3,17 @@
 <head>
     <meta name="viewport" content="width=device-width, user-scalable=no">
     <script src="/static/js/jquery-3.3.1.min.js"></script>
+    <script src="/static/js/node_modules/msgpack-lite/dist/msgpack.min.js"></script>
+    <script src="/static/js/messages.js"></script>
+    <script src="/static/js/transport.js"></script>
     <!-- script src="/static/js/phaser.min.js"></script -->
     <!--script src="https://cdn.jsdelivr.net/phaser/2.6.1/phaser.min.js"></script-->
     <script src="/static/js/phaser-2.6.2/build/phaser.js"></script>
+
 </head>
 <body>
 <div id="gameArea"></div>
 
-<script src="/static/js/messages.js"></script>
 
 <script>
     var cookies = new Map();
@@ -20,13 +23,13 @@
 
     var canvas_width = window.innerWidth * window.devicePixelRatio;
     var canvas_height = window.innerHeight * window.devicePixelRatio;
-    var network = null;
     var lastUpdate = Date.now();
     var efectiveUpdatePeriod = 0;
 
     $(document).ready(function () {
         game = new Phaser.Game(canvas_width, canvas_height, Phaser.AUTO, 'gameArea');
-        gameBootstrapper.init();
+        game.state.add('main', main);
+        game.state.start('main');
     });
 
     var gameProperties = {
@@ -43,7 +46,6 @@
 
     main.prototype = {
         preload: function () {
-
             game.scale.scaleMode = Phaser.ScaleManager.RESIZE;
             game.world.setBounds(0, 0, meters2Pixels(gameProperties.gameWidthMeters), meters2Pixels(gameProperties.gameHeightMeters), false, false, false, false);
             game.time.desiredFps = 48;
@@ -57,23 +59,14 @@
             game.load.image("firefox", "/static/img/firefox.png");
             game.load.script('filter1', '/static/js/phaser-2.6.2/filters/Gray.js');
 
-
             game.scale.compatibility.scrollTo = false;
 
         },
         //this function is fired once when we load the game
         create: function () {
-            console.log("client started");
+            game.transport = new Transport("ws://" + window.location.host + "/ws/", new JSONMarshalUnmarshal());
             createBackground(game);
             createCamera(game);
-
-            network = initNetwork();
-
-            //sendUserJoin("manolito", network);
-
-            setInterval(function () {
-                sendViewPort(game, network)
-            }, 100);
         },
         update: function () {
             updateCamera(game);
@@ -150,11 +143,12 @@
 
     function updateCamera(game) {
 
-
         if (this.game.input.activePointer.isDown) {
             this.game.camera.y -= this.game.input.mouse.event.movementY;
             this.game.camera.x -= this.game.input.mouse.event.movementX;
         }
+
+        sendViewPort(game);
 
         /*
         if (this.zoomFactor > 0.2) {
@@ -190,16 +184,8 @@
     }
 
 
-    var gameBootstrapper = {
-        init: function () {
-            game.state.add('main', main);
-            game.state.start('main');
-        }
-    };
-
     function initNetwork() {
         var socket = new WebSocket("ws://" + window.location.host + "/ws/");
-        socket.binaryType
         socket.onopen = function () {
             console.log("Socket is open");
             setInterval(function () {
@@ -223,7 +209,7 @@
         return socket;
     }
 
-    function sendViewPort(game, network) {
+    function sendViewPort(game) {
         var cam = game.camera;
 
         var msg = new ViewPortRequest(
@@ -232,9 +218,7 @@
                 1.05 * pixels2Meters((cam.x + cam.width) / game.world.scale.x),
                 1.05 * pixels2Meters((cam.y + cam.height) / game.world.scale.y));
 
-        if (network.readyState === network.OPEN) {
-            network.send(JSON.stringify(msg))
-        }
+        game.transport.send(msg);
     }
 
     // TODO: Falla porque la red no está abierta aun
