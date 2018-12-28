@@ -10,6 +10,7 @@
 <body>
 <div id="gameArea"></div>
 
+<script src="/static/js/messages.js"></script>
 
 <script>
     var cookies = new Map();
@@ -198,6 +199,7 @@
 
     function initNetwork() {
         var socket = new WebSocket("ws://" + window.location.host + "/ws/");
+        socket.binaryType
         socket.onopen = function () {
             console.log("Socket is open");
             setInterval(function () {
@@ -212,8 +214,8 @@
             efectiveUpdatePeriod = now - lastUpdate;
             lastUpdate = now;
         };
-        socket.onclose = function () {
-            console.log("Socket closed");
+        socket.onclose = function (t, ev) {
+            console.log("Socket closed", ev);
         };
         socket.onerror = function (e) {
             console.log("Got an error: " + e)
@@ -223,17 +225,13 @@
 
     function sendViewPort(game, network) {
         var cam = game.camera;
-        var zoom = 1.2;
 
-        var msg = {
-            t: "v",
-            d: {
-                x: 0.95 * pixels2Meters(cam.x / game.world.scale.x),
-                y: 0.95 * pixels2Meters(cam.y / game.world.scale.y),
-                xx: 1.05 * pixels2Meters((cam.x + cam.width) / game.world.scale.x),
-                yy: 1.05 * pixels2Meters((cam.y + cam.height) / game.world.scale.y),
-            }
-        };
+        var msg = new ViewPortRequest(
+                0.95 * pixels2Meters(cam.x / game.world.scale.x),
+                0.95 * pixels2Meters(cam.y / game.world.scale.y),
+                1.05 * pixels2Meters((cam.x + cam.width) / game.world.scale.x),
+                1.05 * pixels2Meters((cam.y + cam.height) / game.world.scale.y));
+
         if (network.readyState === network.OPEN) {
             network.send(JSON.stringify(msg))
         }

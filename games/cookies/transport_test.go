@@ -1,4 +1,4 @@
-package cookies
+package cookies_test
 
 import (
 	"testing"
@@ -8,25 +8,46 @@ import (
 	"github.com/x1m3/elixir/games/cookies/codec"
 	"github.com/x1m3/elixir/games/cookies/codec/msgpack"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/x1m3/elixir/games/cookies/messages"
+	"github.com/x1m3/elixir/games/cookies"
 )
+
+type dummyConnection struct {
+	msgs [][]byte
+}
+
+func (c *dummyConnection) Close() error {
+	panic("implement me")
+}
+
+func (c *dummyConnection) WriteMessage(data []byte) error {
+	c.msgs = append(c.msgs, data)
+	return nil
+}
+
+func (c *dummyConnection) ReadMessage() (p []byte, err error) {
+	item := c.msgs[len(c.msgs)-1]
+	c.msgs = c.msgs[0:len(c.msgs)-1]
+	return item, nil
+}
 
 func TestTransport_MarshalUnmarshall(t *testing.T) {
 
-	msg := &ViewPortRequest{X: 1.0/3, Y: 2.0/3, XX: 3.0/3, YY: 4.0/3}
-	msg.SetType(ViewPortRequestType)
+	msg := &messages.ViewPortRequest{X: 1.0 / 3, Y: 2.0 / 3, XX: 3.0 / 3, YY: 4.0 / 3}
+	msg.SetType(messages.ViewPortRequestType)
 
 	for _, codec := range []codec.MarshalUnmarshaler{json.Codec, msgpack.Codec} {
-		transport := NewTransport(codec)
+		transport := cookies.NewTransport(codec, &dummyConnection{})
 
-		data, err := transport.Marshal(msg)
+		err := transport.Send(msg)
 		assert.NoError(t, err, codec.Name())
 
-		recData, err := transport.Unmarshal(data)
+		recData, err := transport.Receive()
 		assert.NoError(t, err, codec.Name())
-		recMsg, ok := recData.(*ViewPortRequest)
+		recMsg, ok := recData.(*messages.ViewPortRequest)
 		assert.True(t, ok, codec.Name())
 
-		spew.Dump(data)
+		spew.Dump(recData)
 
 		assert.Equal(t, msg, recMsg, codec.Name())
 	}
@@ -34,50 +55,23 @@ func TestTransport_MarshalUnmarshall(t *testing.T) {
 
 func BenchmarkTransport_MarshalJson(b *testing.B) {
 
-	msg := &ViewPortRequest{X: 1.0/3, Y: 2.0/3, XX: 3.0/3, YY: 4.0/3}
-	msg.SetType(ViewPortRequestType)
+	msg := &messages.ViewPortRequest{X: 1.0 / 3, Y: 2.0 / 3, XX: 3.0 / 3, YY: 4.0 / 3}
+	msg.SetType(messages.ViewPortRequestType)
 
-	transport := NewTransport(json.Codec)
-	for n:=0;n<b.N; n++ {
-		transport.Marshal(msg)
+	transport := cookies.NewTransport(json.Codec, &dummyConnection{})
+	for n := 0; n < b.N; n++ {
+		transport.Send(msg)
 	}
 }
 
 func BenchmarkTransport_MarshalMsgPack(b *testing.B) {
 
-	msg := &ViewPortRequest{X: 1.0/3, Y: 2.0/3, XX: 3.0/3, YY: 4.0/3}
-	msg.SetType(ViewPortRequestType)
+	msg := &messages.ViewPortRequest{X: 1.0 / 3, Y: 2.0 / 3, XX: 3.0 / 3, YY: 4.0 / 3}
+	msg.SetType(messages.ViewPortRequestType)
 
-	transport := NewTransport(msgpack.Codec)
-	for n:=0;n<b.N; n++ {
-		transport.Marshal(msg)
+	transport := cookies.NewTransport(msgpack.Codec, &dummyConnection{})
+	for n := 0; n < b.N; n++ {
+		transport.Send(msg)
 	}
 }
 
-func BenchmarkTransport_UnMarshalJson(b *testing.B) {
-
-	msg := &ViewPortRequest{X: 1.0/3, Y: 2.0/3, XX: 3.0/3, YY: 4.0/3}
-	msg.SetType(ViewPortRequestType)
-
-	transport := NewTransport(json.Codec)
-
-	data, _ := transport.Marshal(msg)
-
-	for n:=0;n<b.N; n++ {
-		transport.Unmarshal(data)
-	}
-}
-
-func BenchmarkTransport_UnMarshalMsgPack(b *testing.B) {
-
-	msg := &ViewPortRequest{X: 1.0/3, Y: 2.0/3, XX: 3.0/3, YY: 4.0/3}
-	msg.SetType(ViewPortRequestType)
-
-	transport := NewTransport(msgpack.Codec)
-
-	data, _ := transport.Marshal(msg)
-
-	for n:=0;n<b.N; n++ {
-		transport.Unmarshal(data)
-	}
-}

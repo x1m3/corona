@@ -4,44 +4,101 @@ import (
 	"fmt"
 	"github.com/x1m3/elixir/games/cookies/codec"
 	"github.com/gorilla/websocket"
+	"errors"
+	"github.com/x1m3/elixir/games/cookies/messages"
+	"io"
 )
 
-type Transport struct {
+
+type connection interface {
+	io.Closer
+	WriteMessage(data []byte) error
+	ReadMessage() (p []byte, err error)
+}
+
+type WebsocketConnection struct {
+	messageType int
 	conn *websocket.Conn
+}
+
+func NewWebsocketConnection(c *websocket.Conn) *WebsocketConnection {
+	return &WebsocketConnection{conn:c, messageType:websocket.TextMessage}
+}
+
+func (c *WebsocketConnection) Close() error {
+	return c.conn.Close()
+}
+
+func (c *WebsocketConnection) WriteMessage(data []byte) error {
+	return c.conn.WriteMessage(c.messageType, data)
+}
+
+func (c *WebsocketConnection) ReadMessage() (p []byte, err error) {
+	tMsg, data, err := c.conn.ReadMessage()
+	if err != nil {
+		return nil, errors.New("bad connection")
+	}
+	if tMsg != c.messageType {
+		return nil, nil
+	}
+	return data, err
+}
+
+type Transport struct {
+	conn connection
 	e codec.MarshalUnmarshaler
 }
 
-func NewTransport(e codec.MarshalUnmarshaler, c *websocket.Conn) *Transport {
-
+func NewTransport(e codec.MarshalUnmarshaler, c connection) *Transport {
 	return &Transport{e: e, conn: c}
 }
 
-func(t *Transport) Send(data Message) error {
-	panic("implement me")
+func(t *Transport) Send(msg messages.Message) error {
+	data, err := t.marshal(msg)
+	if err!=nil {
+		return err
+	}
+
+	return t.conn.WriteMessage(data)
 }
 
-func(t *Transport) Receive() (Message, error) {
-	panic("implement me")
+func(t *Transport) Receive() (messages.Message, error) {
+	for {
+
+		data, err := t.conn.ReadMessage()
+		if err != nil {
+			return nil, errors.New("bad connection")
+		}
+
+		return t.unmarshal(data)
+	}
 }
 
-func (t *Transport) Marshal(data Message) ([]byte, error) {
+func(t *Transport) Close() error {
+	return t.conn.Close()
+}
+
+
+
+func (t *Transport) marshal(data messages.Message) ([]byte, error) {
 	return t.e.Marshal(data)
 }
 
-func (t *Transport) Unmarshal(data []byte) (interface{}, error) {
-	var msg Message
-	var baseMsg BaseMessage
+func (t *Transport) unmarshal(data []byte) (messages.Message, error) {
+	var msg messages.Message
+	var baseMsg messages.BaseMessage
 
 	if err := t.e.Unmarshal(data, &baseMsg); err != nil {
 		return nil, err
 	}
-	switch baseMsg.GetType() {
-	case ViewPortRequestType:
-		msg = &ViewPortRequest{}
-	case ViewPortResponseType:
-		msg = &ViewportResponse{}
-	case UserJoinRequestType:
-		msg = &UserJoinRequest{}
+	msgType := baseMsg.GetType()
+	switch msgType {
+	case messages.ViewPortRequestType:
+		msg = &messages.ViewPortRequest{}
+	case messages.ViewPortResponseType:
+		msg = &messages.ViewportResponse{}
+	case messages.UserJoinRequestType:
+		msg = &messages.UserJoinRequest{}
 	default:
 		return nil, fmt.Errorf("unknown message type <%s>", baseMsg.GetType())
 	}
@@ -49,6 +106,6 @@ func (t *Transport) Unmarshal(data []byte) (interface{}, error) {
 	if err := t.e.Unmarshal(data, msg); err != nil {
 		return nil, err
 	}
-	msg.SetType(baseMsg.GetType())
+	msg.SetType(msgType)
 	return msg, nil
 }

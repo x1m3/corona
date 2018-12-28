@@ -1,4 +1,4 @@
-package cookies
+package messages
 
 type msgType int8
 

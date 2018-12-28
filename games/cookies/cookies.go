@@ -10,6 +10,7 @@ import (
 	"log"
 
 	"github.com/nu7hatch/gouuid"
+	"github.com/x1m3/elixir/games/cookies/messages"
 )
 
 type Game struct {
@@ -59,28 +60,28 @@ func (g *Game) NewSession() uuid.UUID {
 	return g.gSessions.add()
 }
 
-func (g *Game) UserJoin(sessionID uuid.UUID, req *UserJoinRequest) *CookieInfoResponse {
+func (g *Game) UserJoin(sessionID uuid.UUID, req *messages.UserJoinRequest) *messages.CookieInfoResponse {
 
 	c := &Cookie{Id: rand.Int(), PlayerName: req.Username, Score: 100}
 	x := float64(100 + rand.Intn(int(g.widthX-100)))
 	y := float64(100 + rand.Intn(int(g.widthY-100)))
 	g.addCookieToWorld(x, y, c)
 
-	return &CookieInfoResponse{ID: c.Id, Score: c.Score, X: x, Y: y}
+	return &messages.CookieInfoResponse{ID: c.Id, Score: c.Score, X: x, Y: y}
 }
 
-func (g *Game) ViewPortRequest(sessionID uuid.UUID) *ViewportResponse {
+func (g *Game) ViewPortRequest(sessionID uuid.UUID) *messages.ViewportResponse {
 
 	cookies := g.viewPort(g.gSessions.viewPortRequest(sessionID))
 
-	response := ViewportResponse{}
+	response := messages.ViewportResponse{}
 
-	response.Ants = make([]CookieInfoResponse, 0, len(cookies))
+	response.Ants = make([]messages.CookieInfoResponse, 0, len(cookies))
 	g.worldMutex.RLock()
 	for _, ant := range cookies {
 		pos := ant.GetPosition()
 		response.Ants = append(response.Ants,
-			CookieInfoResponse{
+			messages.CookieInfoResponse{
 				ID:              ant.GetUserData().(*Cookie).Id,
 				Score:           ant.GetUserData().(*Cookie).Score,
 				X:               pos.X,
@@ -92,7 +93,7 @@ func (g *Game) ViewPortRequest(sessionID uuid.UUID) *ViewportResponse {
 	return &response
 }
 
-func (g *Game) UpdateViewPortRequest(sessionID uuid.UUID, req *ViewPortRequest) {
+func (g *Game) UpdateViewPortRequest(sessionID uuid.UUID, req *messages.ViewPortRequest) {
 	g.gSessions.UpdateViewPort(sessionID, req.X, req.Y, req.XX, req.YY)
 }
 
