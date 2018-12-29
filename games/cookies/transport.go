@@ -7,6 +7,7 @@ import (
 	"errors"
 	"github.com/x1m3/elixir/games/cookies/messages"
 	"io"
+	"github.com/davecgh/go-spew/spew"
 )
 
 
@@ -91,6 +92,7 @@ func (t *Transport) unmarshal(data []byte) (messages.Message, error) {
 	if err := t.e.Unmarshal(data, &baseMsg); err != nil {
 		return nil, err
 	}
+
 	msgType := baseMsg.GetType()
 	switch msgType {
 	case messages.ViewPortRequestType:
@@ -103,7 +105,7 @@ func (t *Transport) unmarshal(data []byte) (messages.Message, error) {
 		return nil, fmt.Errorf("unknown message type <%s>", baseMsg.GetType())
 	}
 
-	if err := t.e.Unmarshal(data, msg); err != nil {
+	if err := t.e.Unmarshal(baseMsg.Data, msg); err != nil {
 		return nil, err
 	}
 	msg.SetType(msgType)

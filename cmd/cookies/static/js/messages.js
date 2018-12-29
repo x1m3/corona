@@ -5,4 +5,9 @@ const UserJoinRequestType = 3;
 function ViewPortRequest(x, y, xx, yy) {
     this.t = ViewPortRequestType;
     this.d = {X:x, Y:y, XX:xx, YY:yy}
-}
+};
+
+function UserJoinRequest(username) {
+    this.t = UserJoinRequestType;
+    this.d = {UN:username};
+};

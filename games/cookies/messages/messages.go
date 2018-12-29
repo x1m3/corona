@@ -1,5 +1,7 @@
 package messages
 
+import "encoding/json"
+
 type msgType int8
 
 const (
@@ -15,6 +17,7 @@ type Message interface {
 
 type BaseMessage struct {
 	Type msgType `json:"t"`
+	Data  json.RawMessage `json:"d"`
 }
 
 func (m *BaseMessage) GetType() msgType {
