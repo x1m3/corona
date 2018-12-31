@@ -60,19 +60,30 @@ func (g *Game) NewSession() uuid.UUID {
 	return g.gSessions.add()
 }
 
-func (g *Game) UserJoin(sessionID uuid.UUID, req *messages.UserJoinRequest) *messages.CookieInfoResponse {
+func (g *Game) UserJoin(sessionID uuid.UUID, req *messages.UserJoinRequest) (*messages.CookieInfoResponse, error) {
+
+	err := g.gSessions.Login(sessionID, req.Username)
+	if err != nil {
+		return nil, err
+	}
 
 	c := &Cookie{Id: rand.Int(), PlayerName: req.Username, Score: 100}
 	x := float64(100 + rand.Intn(int(g.widthX-100)))
 	y := float64(100 + rand.Intn(int(g.widthY-100)))
 	g.addCookieToWorld(x, y, c)
 
-	return &messages.CookieInfoResponse{ID: c.Id, Score: c.Score, X: x, Y: y}
+	// TODO: Change type name and inform if login was succesful
+	return &messages.CookieInfoResponse{ID: c.Id, Score: c.Score, X: x, Y: y}, nil
 }
 
-func (g *Game) ViewPortRequest(sessionID uuid.UUID) *messages.ViewportResponse {
+func (g *Game) ViewPortRequest(sessionID uuid.UUID) (*messages.ViewportResponse, error) {
 
-	cookies := g.viewPort(g.gSessions.viewPortRequest(sessionID))
+	v, err := g.gSessions.viewPortRequest(sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	cookies := g.viewPort(v)
 
 	response := messages.ViewportResponse{}
 
@@ -90,8 +101,9 @@ func (g *Game) ViewPortRequest(sessionID uuid.UUID) *messages.ViewportResponse {
 			})
 	}
 	g.worldMutex.RUnlock()
-	return &response
+	return &response, nil
 }
+
 
 func (g *Game) UpdateViewPortRequest(sessionID uuid.UUID, req *messages.ViewPortRequest) {
 	g.gSessions.UpdateViewPort(sessionID, req.X, req.Y, req.XX, req.YY)
@@ -261,7 +273,7 @@ func (g *Game) adjustSpeeds(allMap *box2d.B2AABB) {
 
 }
 
-func (g *Game) viewPort(x, y, xx, yy float32) map[int]*box2d.B2Body {
+func (g *Game) viewPort(v *viewport) map[int]*box2d.B2Body {
 
 	cookies := make(map[int]*box2d.B2Body, 0)
 
@@ -276,7 +288,7 @@ func (g *Game) viewPort(x, y, xx, yy float32) map[int]*box2d.B2Body {
 			}
 			return true
 		},
-		box2d.B2AABB{LowerBound: box2d.MakeB2Vec2(float64(x), float64(y)), UpperBound: box2d.MakeB2Vec2(float64(xx), float64(yy))},
+		box2d.B2AABB{LowerBound: box2d.MakeB2Vec2(float64(v.x), float64(v.y)), UpperBound: box2d.MakeB2Vec2(float64(v.xx), float64(v.yy))},
 	)
 
 	g.worldMutex.RUnlock()

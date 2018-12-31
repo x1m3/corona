@@ -16,8 +16,8 @@ type Message interface {
 }
 
 type BaseMessage struct {
-	Type msgType `json:"t"`
-	Data  json.RawMessage `json:"d"`
+	Type msgType         `json:"t"`
+	Data json.RawMessage `json:"d,omitempty"`
 }
 
 func (m *BaseMessage) GetType() msgType {
@@ -53,4 +53,10 @@ type CookieInfoResponse struct {
 type UserJoinRequest struct {
 	BaseMessage
 	Username string `json:"UN"`
+}
+
+type UserJoinResponse struct {
+	BaseMessage
+	Ok       bool     `json:"OK"`
+	AltNames []string `json:"AN"`
 }

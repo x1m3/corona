@@ -12,8 +12,6 @@ import (
 	"github.com/x1m3/elixir/games/cookies"
 	"github.com/nu7hatch/gouuid"
 
-	"github.com/davecgh/go-spew/spew"
-
 	"github.com/x1m3/elixir/games/cookies/codec/json"
 	"github.com/x1m3/elixir/games/cookies/messages"
 )
@@ -107,8 +105,6 @@ func wsAction(resp http.ResponseWriter, req *http.Request) {
 
 	go handleWSRequests(transport, sessionID)
 
-	time.Sleep(2 * time.Second)
-
 	go manageRemoteView(transport, sessionID, updateClientPeriod)
 
 	log.Println("New Connection")
@@ -118,9 +114,13 @@ func manageRemoteView(transport *cookies.Transport, sessionID uuid.UUID, updateP
 
 	for {
 		time.Sleep(updatePeriod)
-		req := game.ViewPortRequest(sessionID)
+		req, err := game.ViewPortRequest(sessionID)
+		if err != nil {
+			// Do nothing. Probably, game is not in playing state
+			continue
+		}
 
-		err := transport.Send(req)
+		err = transport.Send(req)
 		if err != nil {
 			log.Printf("Socket broken while writing. Closing connection. Err:<%v>", err)
 			transport.Close()
@@ -132,12 +132,10 @@ func manageRemoteView(transport *cookies.Transport, sessionID uuid.UUID, updateP
 func handleWSRequests(transport *cookies.Transport, sessionID uuid.UUID) {
 
 	for {
-
 		msg, err := transport.Receive()
 		if err != nil {
 			log.Printf("Closing conection. Err:<%v>", err)
 			transport.Close()
-
 			return
 		}
 
@@ -147,10 +145,15 @@ func handleWSRequests(transport *cookies.Transport, sessionID uuid.UUID) {
 
 		case messages.UserJoinRequestType: // join user
 			req := msg.(*messages.UserJoinRequest)
-			spew.Dump(req)
+			resp, err := game.UserJoin(sessionID, req)
 
-			if err := transport.Send(game.UserJoin(sessionID, req)); err != nil {
+			if err != nil {
 				log.Printf("UserJoin error: <%s>", err)
+				continue
+			}
+
+			if err := transport.Send(resp); err != nil {
+				log.Printf("Error sending response, Err:<%v>", err)
 			}
 
 		default:

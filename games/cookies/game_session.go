@@ -3,22 +3,33 @@ package cookies
 import (
 	"github.com/nu7hatch/gouuid"
 	"sync"
+	"github.com/pkg/errors"
 )
 
 type gameSession struct {
-	ID         uuid.UUID
-	viewportX  float32
-	viewportY  float32
-	viewportXX float32
-	viewportYY float32
+	ID       uuid.UUID
+	userName string
+	logged   bool
+	state    state
+	viewport *viewport
 }
 
-func (s *gameSession) viewPortRequest() (float32, float32, float32, float32) {
-	return s.viewportX, s.viewportY, s.viewportXX, s.viewportYY
+type viewport struct {
+	x  float32
+	y  float32
+	xx float32
+	yy float32
+}
+
+var errUserWasLogged = errors.New("user already logged")
+var errCannotSendScreenUpdates = errors.New("session not found")
+
+func newGameSession(id uuid.UUID) *gameSession {
+	return &gameSession{ID: id, state: &notLoggedState{}}
 }
 
 func (s *gameSession) updateViewPort(x float32, y float32, xx float32, yy float32) {
-	s.viewportX, s.viewportY, s.viewportXX, s.viewportYY = x, y, xx, yy
+	s.viewport = &viewport{x: x, y: y, xx: xx, yy: xx}
 }
 
 type gameSessions struct {
@@ -35,19 +46,51 @@ func newGameSessions() *gameSessions {
 func (s *gameSessions) add() uuid.UUID {
 	ID, _ := uuid.NewV4()
 	s.Lock()
-	s.sessions[*ID] = &gameSession{ID: *ID}
+	s.sessions[*ID] = newGameSession(*ID)
 	s.Unlock()
 	return *ID
 }
 
-func (s *gameSessions) viewPortRequest(ID uuid.UUID) (float32, float32, float32, float32) {
+func (s *gameSessions) viewPortRequest(ID uuid.UUID) (*viewport, error) {
 	s.RLock()
 	defer s.RUnlock()
-	return s.sessions[ID].viewPortRequest()
+
+	session := s.sessions[ID] // Always should exist.
+
+	if !session.state.canSendScreenUpdates() {
+		return nil, errCannotSendScreenUpdates
+	}
+
+	return session.viewport, nil
 }
 
-func (s *gameSessions) UpdateViewPort(ID uuid.UUID, x float32, y float32, xx float32, yy float32) {
+func (s *gameSessions) UpdateViewPort(ID uuid.UUID, x float32, y float32, xx float32, yy float32) error {
 	s.Lock()
-	s.sessions[ID].updateViewPort(x, y, xx, yy)
-	s.Unlock()
+	defer s.Unlock()
+
+	session := s.sessions[ID] // Always should exist.
+
+	if !session.state.canSendScreenUpdates() {
+		return errCannotSendScreenUpdates
+	}
+
+	session.updateViewPort(x, y, xx, yy)
+
+	return nil
+}
+
+func (s *gameSessions) Login(ID uuid.UUID, username string) error{
+	s.Lock()
+	defer s.Unlock()
+
+	session := s.sessions[ID]
+	if session.logged{
+		return errUserWasLogged
+	}
+
+	session.state = &loggedState{}
+	session.userName = username
+	session.logged = true
+
+	return nil
 }
