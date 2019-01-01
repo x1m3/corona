@@ -1,6 +1,8 @@
 package messages
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 type msgType int8
 
@@ -8,6 +10,7 @@ const (
 	ViewPortRequestType  = 1
 	ViewPortResponseType = 2
 	UserJoinRequestType  = 3
+	UserJoinResponseType = 4
 )
 
 type Message interface {
@@ -43,7 +46,7 @@ type ViewportResponse struct {
 
 type CookieInfoResponse struct {
 	BaseMessage
-	ID              int
+	ID              int     `json:"ID"`
 	Score           int     `json:"SC"`
 	X               float64 `json:"X"`
 	Y               float64 `json:"Y"`
@@ -55,8 +58,18 @@ type UserJoinRequest struct {
 	Username string `json:"UN"`
 }
 
-type UserJoinResponse struct {
-	BaseMessage
+type userJoinResponseData struct {
 	Ok       bool     `json:"OK"`
 	AltNames []string `json:"AN"`
+}
+
+type UserJoinResponse struct {
+	BaseMessage
+	Data userJoinResponseData `json:"d"`
+}
+
+func NewUserJoinResponse(ok bool, altNames []string) *UserJoinResponse {
+	resp := &UserJoinResponse{Data: userJoinResponseData{Ok: ok, AltNames: altNames}}
+	resp.SetType(UserJoinResponseType)
+	return resp
 }

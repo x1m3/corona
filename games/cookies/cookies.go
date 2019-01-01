@@ -60,7 +60,7 @@ func (g *Game) NewSession() uuid.UUID {
 	return g.gSessions.add()
 }
 
-func (g *Game) UserJoin(sessionID uuid.UUID, req *messages.UserJoinRequest) (*messages.CookieInfoResponse, error) {
+func (g *Game) UserJoin(sessionID uuid.UUID, req *messages.UserJoinRequest) (*messages.UserJoinResponse, error) {
 
 	err := g.gSessions.Login(sessionID, req.Username)
 	if err != nil {
@@ -73,7 +73,7 @@ func (g *Game) UserJoin(sessionID uuid.UUID, req *messages.UserJoinRequest) (*me
 	g.addCookieToWorld(x, y, c)
 
 	// TODO: Change type name and inform if login was succesful
-	return &messages.CookieInfoResponse{ID: c.Id, Score: c.Score, X: x, Y: y}, nil
+	return messages.NewUserJoinResponse(true, nil), nil
 }
 
 func (g *Game) ViewPortRequest(sessionID uuid.UUID) (*messages.ViewportResponse, error) {

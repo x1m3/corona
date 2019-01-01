@@ -144,14 +144,11 @@ func handleWSRequests(transport *cookies.Transport, sessionID uuid.UUID) {
 			game.UpdateViewPortRequest(sessionID, msg.(*messages.ViewPortRequest))
 
 		case messages.UserJoinRequestType: // join user
-			req := msg.(*messages.UserJoinRequest)
-			resp, err := game.UserJoin(sessionID, req)
-
+			resp, err := game.UserJoin(sessionID, msg.(*messages.UserJoinRequest))
 			if err != nil {
 				log.Printf("UserJoin error: <%s>", err)
 				continue
 			}
-
 			if err := transport.Send(resp); err != nil {
 				log.Printf("Error sending response, Err:<%v>", err)
 			}
