@@ -7,10 +7,11 @@ import (
 type msgType int8
 
 const (
-	ViewPortRequestType  = 1
-	ViewPortResponseType = 2
-	UserJoinRequestType  = 3
-	UserJoinResponseType = 4
+	ViewPortRequestType     = 1
+	ViewPortResponseType    = 2
+	UserJoinRequestType     = 3
+	UserJoinResponseType    = 4
+	CreateCookieRequestType = 5
 )
 
 type Message interface {
@@ -41,16 +42,34 @@ type ViewPortRequest struct {
 
 type ViewportResponse struct {
 	BaseMessage
-	Ants []CookieInfoResponse
+	Ants []*CookieInfoResponse
+}
+
+type cookieInfo struct {
+	ID              int     `json:"ID"`
+	Score           int     `json:"SC"`
+	X               float32 `json:"X"`
+	Y               float32 `json:"Y"`
+	AngularVelocity float32 `json:"AV"`
 }
 
 type CookieInfoResponse struct {
 	BaseMessage
-	ID              int     `json:"ID"`
-	Score           int     `json:"SC"`
-	X               float64 `json:"X"`
-	Y               float64 `json:"Y"`
-	AngularVelocity float64 `json:"AV"`
+	Data cookieInfo `json:"d"`
+}
+
+func NewCookieInfoResponse(ID int, sc int, X float32, Y float32, AngularVelocity float32) *CookieInfoResponse {
+	resp := &CookieInfoResponse{
+		Data : cookieInfo{
+			ID:              ID,
+			Score:           sc,
+			X:               X,
+			Y:               Y,
+			AngularVelocity: AngularVelocity,
+		},
+	}
+	resp.SetType(ViewPortResponseType)
+	return resp
 }
 
 type UserJoinRequest struct {
@@ -72,4 +91,8 @@ func NewUserJoinResponse(ok bool, altNames []string) *UserJoinResponse {
 	resp := &UserJoinResponse{Data: userJoinResponseData{Ok: ok, AltNames: altNames}}
 	resp.SetType(UserJoinResponseType)
 	return resp
+}
+
+type CreateCookieRequest struct {
+	BaseMessage
 }

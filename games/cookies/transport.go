@@ -100,6 +100,8 @@ func (t *Transport) unmarshal(data []byte) (messages.Message, error) {
 		msg = &messages.ViewportResponse{}
 	case messages.UserJoinRequestType:
 		msg = &messages.UserJoinRequest{}
+	case messages.CreateCookieRequestType:
+		msg = &messages.CreateCookieRequest{}
 	default:
 		return nil, fmt.Errorf("unknown message type <%s>", baseMsg.GetType())
 	}

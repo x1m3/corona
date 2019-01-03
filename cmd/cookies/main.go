@@ -130,6 +130,8 @@ func manageRemoteView(transport *cookies.Transport, sessionID uuid.UUID, updateP
 }
 
 func handleWSRequests(transport *cookies.Transport, sessionID uuid.UUID) {
+	var resp messages.Message
+	var errResp error
 
 	for {
 		msg, err := transport.Receive()
@@ -139,22 +141,31 @@ func handleWSRequests(transport *cookies.Transport, sessionID uuid.UUID) {
 			return
 		}
 
+		errResp = nil
+		resp = nil
+
 		switch msg.GetType() {
 		case messages.ViewPortRequestType:
 			game.UpdateViewPortRequest(sessionID, msg.(*messages.ViewPortRequest))
 
 		case messages.UserJoinRequestType: // join user
-			resp, err := game.UserJoin(sessionID, msg.(*messages.UserJoinRequest))
-			if err != nil {
-				log.Printf("UserJoin error: <%s>", err)
-				continue
-			}
-			if err := transport.Send(resp); err != nil {
-				log.Printf("Error sending response, Err:<%v>", err)
-			}
+			resp, errResp = game.UserJoin(sessionID, msg.(*messages.UserJoinRequest))
+
+		case messages.CreateCookieRequestType:
+			resp,errResp = game.CreateCookie(sessionID, msg.(*messages.CreateCookieRequest))
 
 		default:
 			log.Printf("got unknown message type <%v>", msg)
+		}
+
+		if errResp != nil {
+			log.Printf("Error: <%s>", err)
+			continue
+		}
+		if resp != nil {
+			if err := transport.Send(resp); err != nil {
+				log.Printf("Error sending response, Err:<%v>", err)
+			}
 		}
 	}
 }

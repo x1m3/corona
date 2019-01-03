@@ -29,9 +29,9 @@ type Game struct {
 }
 
 type Cookie struct {
-	Id         int
-	PlayerName string
-	Score      int
+	Id        int
+	SessionID uuid.UUID
+	Score     int
 }
 
 // New returns a new cookies game.
@@ -67,13 +67,21 @@ func (g *Game) UserJoin(sessionID uuid.UUID, req *messages.UserJoinRequest) (*me
 		return nil, err
 	}
 
-	c := &Cookie{Id: rand.Int(), PlayerName: req.Username, Score: 100}
+	// TODO: Change type name and inform if login was succesful
+	return messages.NewUserJoinResponse(true, nil), nil
+}
+
+func (g *Game) CreateCookie(sessionID uuid.UUID, req *messages.CreateCookieRequest) (*messages.CookieInfoResponse, error) {
+
+	if err := g.gSessions.StartPlaying(sessionID); err != nil {
+		return nil, err
+	}
+
+	c := &Cookie{Id: rand.Int(), SessionID: sessionID, Score: 100}
 	x := float64(100 + rand.Intn(int(g.widthX-100)))
 	y := float64(100 + rand.Intn(int(g.widthY-100)))
 	g.addCookieToWorld(x, y, c)
-
-	// TODO: Change type name and inform if login was succesful
-	return messages.NewUserJoinResponse(true, nil), nil
+	return messages.NewCookieInfoResponse(c.Id, c.Score, float32(x), float32(y), 10), nil
 }
 
 func (g *Game) ViewPortRequest(sessionID uuid.UUID) (*messages.ViewportResponse, error) {
@@ -87,23 +95,22 @@ func (g *Game) ViewPortRequest(sessionID uuid.UUID) (*messages.ViewportResponse,
 
 	response := messages.ViewportResponse{}
 
-	response.Ants = make([]messages.CookieInfoResponse, 0, len(cookies))
+	response.Ants = make([]*messages.CookieInfoResponse, 0, len(cookies))
 	g.worldMutex.RLock()
 	for _, ant := range cookies {
 		pos := ant.GetPosition()
 		response.Ants = append(response.Ants,
-			messages.CookieInfoResponse{
-				ID:              ant.GetUserData().(*Cookie).Id,
-				Score:           ant.GetUserData().(*Cookie).Score,
-				X:               pos.X,
-				Y:               pos.Y,
-				AngularVelocity: ant.GetAngularVelocity(),
-			})
+			messages.NewCookieInfoResponse(
+				ant.GetUserData().(*Cookie).Id,
+				ant.GetUserData().(*Cookie).Score,
+				float32(pos.X),
+				float32(pos.Y),
+				float32(ant.GetAngularVelocity())))
+
 	}
 	g.worldMutex.RUnlock()
 	return &response, nil
 }
-
 
 func (g *Game) UpdateViewPortRequest(sessionID uuid.UUID, req *messages.ViewPortRequest) {
 	g.gSessions.UpdateViewPort(sessionID, req.X, req.Y, req.XX, req.YY)
@@ -187,7 +194,8 @@ func (g *Game) initCookies(number int, maxX float64, maxY float64) []*box2d.B2Bo
 	bodies := make([]*box2d.B2Body, 0, number)
 
 	for i := 0; i < number; i++ {
-		cookie := g.addCookieToWorld(maxX*rand.Float64(), maxY*rand.Float64(), &Cookie{Id: i, PlayerName: "manolo", Score: rand.Intn(200) + 20})
+		uuid, _ := uuid.NewV4()
+		cookie := g.addCookieToWorld(maxX*rand.Float64(), maxY*rand.Float64(), &Cookie{Id: i, SessionID: *uuid, Score: rand.Intn(200) + 20})
 		bodies = append(bodies, cookie)
 	}
 	return bodies

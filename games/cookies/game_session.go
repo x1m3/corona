@@ -4,6 +4,7 @@ import (
 	"github.com/nu7hatch/gouuid"
 	"sync"
 	"github.com/pkg/errors"
+	"fmt"
 )
 
 type gameSession struct {
@@ -91,6 +92,20 @@ func (s *gameSessions) Login(ID uuid.UUID, username string) error{
 	session.state = &loggedState{}
 	session.userName = username
 	session.logged = true
+
+	return nil
+}
+
+func (s *gameSessions) StartPlaying(ID uuid.UUID) error {
+	s.Lock()
+	defer s.Unlock()
+
+	session := s.sessions[ID]
+	if _, ok := session.state.(*loggedState); !ok {
+		return fmt.Errorf("not logged user wants to play")
+	}
+
+	session.state = &playingState{}
 
 	return nil
 }
