@@ -7,9 +7,9 @@ const CreateCookieResponseType= 6;
 
 
 
-function ViewPortRequest(x, y, xx, yy) {
+function ViewPortRequest(x, y, xx, yy, angle, turbo) {
     this.t = ViewPortRequestType;
-    this.d = {X:x, Y:y, XX:xx, YY:yy}
+    this.d = {X:x, Y:y, XX:xx, YY:yy, R:angle, T:turbo}
 };
 
 function UserJoinRequest(username) {

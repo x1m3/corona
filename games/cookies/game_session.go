@@ -57,8 +57,9 @@ func (s *gameSessions) viewPortRequest(ID uuid.UUID) (*viewport, error) {
 	defer s.RUnlock()
 
 	session := s.sessions[ID] // Always should exist.
+	viewport := session.viewport
 
-	if !session.state.canSendScreenUpdates() {
+	if !session.state.canSendScreenUpdates() || viewport == nil {
 		return nil, errCannotSendScreenUpdates
 	}
 
@@ -80,12 +81,12 @@ func (s *gameSessions) UpdateViewPort(ID uuid.UUID, x float32, y float32, xx flo
 	return nil
 }
 
-func (s *gameSessions) Login(ID uuid.UUID, username string) error{
+func (s *gameSessions) Login(ID uuid.UUID, username string) error {
 	s.Lock()
 	defer s.Unlock()
 
 	session := s.sessions[ID]
-	if session.logged{
+	if session.logged {
 		return errUserWasLogged
 	}
 

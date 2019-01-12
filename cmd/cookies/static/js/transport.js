@@ -18,7 +18,7 @@ function MsgPackMarshalUnmarshal() {
 }
 
 function Transport(wsUrl, coder) {
-    _this = this;
+    var _this = this;
     this.coder = coder;
     this.conn = new WebSocket(wsUrl);
     this.callbacks = new Map();

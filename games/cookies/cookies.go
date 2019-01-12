@@ -71,7 +71,7 @@ func (g *Game) UserJoin(sessionID uuid.UUID, req *messages.UserJoinRequest) (*me
 	return messages.NewUserJoinResponse(true, nil), nil
 }
 
-func (g *Game) CreateCookie(sessionID uuid.UUID, req *messages.CreateCookieRequest) (*messages.CookieInfoResponse, error) {
+func (g *Game) CreateCookie(sessionID uuid.UUID, req *messages.CreateCookieRequest) (*messages.CreateCookieResponse, error) {
 
 	if err := g.gSessions.StartPlaying(sessionID); err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ func (g *Game) CreateCookie(sessionID uuid.UUID, req *messages.CreateCookieReque
 	x := float64(100 + rand.Intn(int(g.widthX-100)))
 	y := float64(100 + rand.Intn(int(g.widthY-100)))
 	g.addCookieToWorld(x, y, c)
-	return messages.NewCookieInfoResponse(c.Id, c.Score, float32(x), float32(y), 10), nil
+	return messages.NewCreateCookieResponse(c.Id, c.Score, float32(x), float32(y), 10), nil
 }
 
 func (g *Game) ViewPortRequest(sessionID uuid.UUID) (*messages.ViewportResponse, error) {
@@ -94,19 +94,21 @@ func (g *Game) ViewPortRequest(sessionID uuid.UUID) (*messages.ViewportResponse,
 	cookies := g.viewPort(v)
 
 	response := messages.ViewportResponse{}
+	response.Type = messages.ViewPortResponseType
 
-	response.Ants = make([]*messages.CookieInfoResponse, 0, len(cookies))
+	response.Ants = make([]*messages.CookieInfo, 0, len(cookies))
 	g.worldMutex.RLock()
 	for _, ant := range cookies {
 		pos := ant.GetPosition()
-		response.Ants = append(response.Ants,
-			messages.NewCookieInfoResponse(
-				ant.GetUserData().(*Cookie).Id,
-				ant.GetUserData().(*Cookie).Score,
-				float32(pos.X),
-				float32(pos.Y),
-				float32(ant.GetAngularVelocity())))
-
+		response.Ants = append(
+			response.Ants,
+			&messages.CookieInfo{
+				ID:              ant.GetUserData().(*Cookie).Id,
+				Score:           ant.GetUserData().(*Cookie).Score,
+				X:               float32(pos.X),
+				Y:               float32(pos.Y),
+				AngularVelocity: float32(ant.GetAngularVelocity()),
+			})
 	}
 	g.worldMutex.RUnlock()
 	return &response, nil

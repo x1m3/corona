@@ -49,6 +49,7 @@
         preload: function () {
             game.load.image("logo-intro", "/static/img/intro.png");
             game.transport = new Transport("ws://" + window.location.host + "/ws/", new JSONMarshalUnmarshal());
+            game.myCookie = null;
         },
         create: function () {
             game.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
@@ -109,11 +110,11 @@
             bg.autoScroll(-10, -5);
 
             game.transport.registerCallback(
-                UserJoinResponseType,
-                function(msg) {
-                    console.log(msg);
-                    game.state.start('main');
-                }
+                    UserJoinResponseType,
+                    function (msg) {
+                        console.log(msg);
+                        game.state.start('main');
+                    }
             );
 
             var input = game.add.inputField((this.game.width - login_width) / 2, (this.game.height - login_height) / 2, {
@@ -165,11 +166,49 @@
 
             createCamera(game);
 
+            game.transport.registerCallback(
+                    CreateCookieResponseType,
+                    function (msg) {
+                        console.log(msg);
+                        cookie = createCookie(game, msg.d.ID, msg.d.X, msg.d.Y, msg.d.SC, msg.d.AV)
+                        game.myCookie = cookie;
+                        game.camera.follow(cookie);
+
+                    }
+            );
+
             game.transport.send(new CreateCookieRequest());
         },
         update: function () {
-            updateCamera(game);
-        }
+            if (game.myCookie !== null) {
+                updateCamera(game);
+            }
+        },
+    };
+
+    function createCookie(game, id, x, y, score, angularVelocity) {
+        cookie = game.add.sprite(x, y, "firefox");
+        cookie.custom = {};
+        cookie.custom.id = id;
+        cookie.custom.score = score;
+        cookie.alpha = 0;
+        cookie.anchor.setTo(0.5, 0.5);
+        cookie.width = meters2Pixels(1.3 * 2 * Math.sqrt(score));
+        cookie.height = meters2Pixels(1.3 * 2 * Math.sqrt(score));
+        cookie.maxAngular = 100000;
+        cookie.angularDrag = 0;
+        cookie.visible = true;
+        /*
+        var filter = game.add.filter('Gray');
+        filter.blur = 0.05 * msg.SC;
+        //ant.filters = [filter];
+        */
+        game.add.tween(cookie).to({alpha: 1}, 500, Phaser.Easing.None, true);
+        game.physics.enable(cookie, Phaser.Physics.ARCADE);
+        cookie.body.allowRotation = true;
+        cookie.body.angularVelocity = 10 * angularVelocity;
+
+        return cookie;
     };
 
     function updateCookies(game) {
@@ -197,7 +236,6 @@
 
                 game.physics.enable(ant, Phaser.Physics.ARCADE);
                 ant.body.allowRotation = true;
-
 
                 antInfo.ant = ant;
                 map.set(key, antInfo);
@@ -235,22 +273,26 @@
 
     function updateCamera(game) {
 
-        if (this.game.input.activePointer.isDown) {
-            this.game.camera.y -= this.game.input.mouse.event.movementY;
-            this.game.camera.x -= this.game.input.mouse.event.movementX;
-        }
+        var cam = game.camera;
 
-        sendViewPort(game);
+        var msg = new ViewPortRequest(
+                0.95 * pixels2Meters(cam.x / game.world.scale.x),
+                0.95 * pixels2Meters(cam.y / game.world.scale.y),
+                1.05 * pixels2Meters((cam.x + cam.width) / game.world.scale.x),
+                1.05 * pixels2Meters((cam.y + cam.height) / game.world.scale.y),
+                game.physics.arcade.angleToPointer(game.myCookie),
+                this.game.input.activePointer.isDown
+        );
 
-        /*
-        if (this.zoomFactor > 0.2) {
-            this.zoomFactor -= 0.001;
-            game.world.scale.setTo(this.zoomFactor);
-        }
-        */
+        console.log(msg);
 
-
+        game.transport.send(msg);
     }
+
+
+
+
+
 
     function refreshAntsPosition(positions) {
 
@@ -299,18 +341,6 @@
             console.log("Got an error: " + e)
         };
         return socket;
-    }
-
-    function sendViewPort(game) {
-        var cam = game.camera;
-
-        var msg = new ViewPortRequest(
-                0.95 * pixels2Meters(cam.x / game.world.scale.x),
-                0.95 * pixels2Meters(cam.y / game.world.scale.y),
-                1.05 * pixels2Meters((cam.x + cam.width) / game.world.scale.x),
-                1.05 * pixels2Meters((cam.y + cam.height) / game.world.scale.y));
-
-        game.transport.send(msg);
     }
 
     // TODO: Falla porque la red no está abierta aun

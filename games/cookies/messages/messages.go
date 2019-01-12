@@ -7,11 +7,12 @@ import (
 type msgType int8
 
 const (
-	ViewPortRequestType     = 1
-	ViewPortResponseType    = 2
-	UserJoinRequestType     = 3
-	UserJoinResponseType    = 4
-	CreateCookieRequestType = 5
+	ViewPortRequestType      = 1
+	ViewPortResponseType     = 2
+	UserJoinRequestType      = 3
+	UserJoinResponseType     = 4
+	CreateCookieRequestType  = 5
+	CreateCookieResponseType = 6
 )
 
 type Message interface {
@@ -42,10 +43,10 @@ type ViewPortRequest struct {
 
 type ViewportResponse struct {
 	BaseMessage
-	Ants []*CookieInfoResponse
+	Ants []*CookieInfo
 }
 
-type cookieInfo struct {
+type CookieInfo struct {
 	ID              int     `json:"ID"`
 	Score           int     `json:"SC"`
 	X               float32 `json:"X"`
@@ -53,14 +54,14 @@ type cookieInfo struct {
 	AngularVelocity float32 `json:"AV"`
 }
 
-type CookieInfoResponse struct {
+type CreateCookieResponse struct {
 	BaseMessage
-	Data cookieInfo `json:"d"`
+	Data CookieInfo `json:"d"`
 }
 
-func NewCookieInfoResponse(ID int, sc int, X float32, Y float32, AngularVelocity float32) *CookieInfoResponse {
-	resp := &CookieInfoResponse{
-		Data : cookieInfo{
+func NewCreateCookieResponse(ID int, sc int, X float32, Y float32, AngularVelocity float32) *CreateCookieResponse {
+	resp := &CreateCookieResponse{
+		Data: CookieInfo{
 			ID:              ID,
 			Score:           sc,
 			X:               X,
@@ -68,7 +69,7 @@ func NewCookieInfoResponse(ID int, sc int, X float32, Y float32, AngularVelocity
 			AngularVelocity: AngularVelocity,
 		},
 	}
-	resp.SetType(ViewPortResponseType)
+	resp.SetType(CreateCookieResponseType)
 	return resp
 }
 
