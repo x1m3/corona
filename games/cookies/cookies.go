@@ -96,12 +96,12 @@ func (g *Game) ViewPortRequest(sessionID uuid.UUID) (*messages.ViewportResponse,
 	response := messages.ViewportResponse{}
 	response.Type = messages.ViewPortResponseType
 
-	response.Ants = make([]*messages.CookieInfo, 0, len(cookies))
+	response.Cookies = make([]*messages.CookieInfo, 0, len(cookies))
 	g.worldMutex.RLock()
 	for _, ant := range cookies {
 		pos := ant.GetPosition()
-		response.Ants = append(
-			response.Ants,
+		response.Cookies = append(
+			response.Cookies,
 			&messages.CookieInfo{
 				ID:              ant.GetUserData().(*Cookie).Id,
 				Score:           ant.GetUserData().(*Cookie).Score,
@@ -115,7 +115,7 @@ func (g *Game) ViewPortRequest(sessionID uuid.UUID) (*messages.ViewportResponse,
 }
 
 func (g *Game) UpdateViewPortRequest(sessionID uuid.UUID, req *messages.ViewPortRequest) {
-	g.gSessions.UpdateViewPort(sessionID, req.X, req.Y, req.XX, req.YY)
+	g.gSessions.UpdateViewPort(sessionID, req)
 }
 
 func (g *Game) EventListener() <-chan pubsub.Event {
@@ -299,6 +299,7 @@ func (g *Game) viewPort(v *viewport) map[int]*box2d.B2Body {
 			return true
 		},
 		box2d.B2AABB{LowerBound: box2d.MakeB2Vec2(float64(v.x), float64(v.y)), UpperBound: box2d.MakeB2Vec2(float64(v.xx), float64(v.yy))},
+		//Return all box2d.B2AABB{LowerBound: box2d.MakeB2Vec2(0, 0), UpperBound: box2d.MakeB2Vec2(g.widthX, g.widthY)},
 	)
 
 	g.worldMutex.RUnlock()

@@ -35,15 +35,17 @@ func (m *BaseMessage) SetType(t msgType) {
 
 type ViewPortRequest struct {
 	BaseMessage
-	X  float32
-	Y  float32
-	XX float32
-	YY float32
+	X     float32 `json:"X"`
+	Y     float32 `json:"Y"`
+	XX    float32 `json:"XX"`
+	YY    float32 `json:"YY"`
+	Angle float32 `json:"R"`
+	Turbo bool    `json:"T"`
 }
 
 type ViewportResponse struct {
 	BaseMessage
-	Ants []*CookieInfo
+	Cookies []*CookieInfo  `json:"C"`
 }
 
 type CookieInfo struct {

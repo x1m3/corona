@@ -169,11 +169,18 @@
             game.transport.registerCallback(
                     CreateCookieResponseType,
                     function (msg) {
-                        console.log(msg);
-                        cookie = createCookie(game, msg.d.ID, msg.d.X, msg.d.Y, msg.d.SC, msg.d.AV)
+                        cookie = createCookie(game, msg.d.ID, msg.d.X, msg.d.Y, msg.d.SC, msg.d.AV);
                         game.myCookie = cookie;
-                        game.camera.follow(cookie);
+                        game.camera.follow(cookie, Phaser.Camera.FOLLOW_LOCKON, 1, 1);
 
+                    }
+            );
+
+            game.transport.registerCallback(
+                    ViewPortResponseType,
+                    function (msg) {
+                        console.log(msg);
+                        updateCookies(game, msg.C);
                     }
             );
 
@@ -187,10 +194,11 @@
     };
 
     function createCookie(game, id, x, y, score, angularVelocity) {
-        cookie = game.add.sprite(x, y, "firefox");
+        cookie = game.add.sprite(meters2Pixels(x), meters2Pixels(y), "firefox");
         cookie.custom = {};
         cookie.custom.id = id;
         cookie.custom.score = score;
+        cookie.custom.type = "cookie";
         cookie.alpha = 0;
         cookie.anchor.setTo(0.5, 0.5);
         cookie.width = meters2Pixels(1.3 * 2 * Math.sqrt(score));
@@ -211,9 +219,46 @@
         return cookie;
     };
 
-    function updateCookies(game) {
+
+    function updateCookies(game, serverCookies) {
+
+        // OrderedIDs contains all ids in serverCookies ordered from low to high
+        var orderedIDs = function(cookies) {
+            ids = [];
+            cookies.forEach(function(el) {ids.push(el.ID)});
+            return ids.sort(function(a, b) {return a - b;});
+        }(serverCookies);
+
+
+        // Positioning or removing known cookies
+        game.world.forEach(function(cookie){
+            if (cookie.custom !== undefined && cookie.custom.type==="cookie") {
+                // Not in list. We should disable
+                if (orderedIDs.indexOf(cookie.custom.id)===-1 && cookie.custom.id !== game.myCookie.custom.id) {
+                    cookie.visible = false;
+                    //cookie.body.destroy();
+                    cookie.destroy();
+                    alert("destroyed");
+                } else { // In list. We should update position
+                    cookie.visible = true;
+                    serverCookies.forEach(function(info) {
+                        if (info.ID === cookie.custom.id) {
+                            game.physics.arcade.moveToXY(cookie, info.X, info.Y, 500, gameProperties.updateClientPeriod);
+                        }
+                    });
+                }
+            }
+        }, this, true);
+
+
+        /*
+
+        game.world.forEach(function)
+
 
         cookies.forEach(function (antInfo, key, map) {
+
+
 
             var ant = antInfo.ant;
             if (ant === null) {
@@ -259,6 +304,7 @@
                 map.delete(key);
             }
         })
+        */
     }
 
     function createCamera(game) {
@@ -268,30 +314,26 @@
 
         game.world.scale.setTo(this.zoomFactor);
         game.camera.focusOnXY(cameraFocusX * game.world.scale.x, cameraFocusY * game.world.scale.y);
-
     }
 
     function updateCamera(game) {
 
         var cam = game.camera;
+        var cookie = game.myCookie;
+        var angle = Math.atan2((game.input.worldY / game.world.scale.y - cookie.y), (game.input.worldX / game.world.scale.x - cookie.x));
 
         var msg = new ViewPortRequest(
                 0.95 * pixels2Meters(cam.x / game.world.scale.x),
                 0.95 * pixels2Meters(cam.y / game.world.scale.y),
                 1.05 * pixels2Meters((cam.x + cam.width) / game.world.scale.x),
                 1.05 * pixels2Meters((cam.y + cam.height) / game.world.scale.y),
-                game.physics.arcade.angleToPointer(game.myCookie),
+                angle,
                 this.game.input.activePointer.isDown
         );
 
-        console.log(msg);
 
         game.transport.send(msg);
     }
-
-
-
-
 
 
     function refreshAntsPosition(positions) {
@@ -312,48 +354,9 @@
                 X: meters2Pixels(newPosition.X),
                 Y: meters2Pixels(newPosition.Y),
                 visible: true,
-                AV: newPosition.AV * 180 / Math.PI
+                AV: newPosition.AV //* 180 / Math.PI
             });
         });
-    }
-
-
-    function initNetwork() {
-        var socket = new WebSocket("ws://" + window.location.host + "/ws/");
-        socket.onopen = function () {
-            console.log("Socket is open");
-            setInterval(function () {
-                updateCookies(game);
-            }, 1000 * gameProperties.updateClientPeriod);
-
-        };
-        socket.onmessage = function (e) {
-            refreshAntsPosition(JSON.parse(e.data));
-
-            var now = Date.now();
-            efectiveUpdatePeriod = now - lastUpdate;
-            lastUpdate = now;
-        };
-        socket.onclose = function (t, ev) {
-            console.log("Socket closed", ev);
-        };
-        socket.onerror = function (e) {
-            console.log("Got an error: " + e)
-        };
-        return socket;
-    }
-
-    // TODO: Falla porque la red no está abierta aun
-    function sendUserJoin(username, network) {
-        var msg = {
-            t: "j",
-            d: {
-                "UN": username
-            }
-        };
-        if (network.readyState === network.OPEN) {
-            network.send(JSON.stringify(msg))
-        }
     }
 
     function meters2Pixels(meters) {

@@ -5,6 +5,7 @@ import (
 	"sync"
 	"github.com/pkg/errors"
 	"fmt"
+	"github.com/x1m3/elixir/games/cookies/messages"
 )
 
 type gameSession struct {
@@ -16,10 +17,12 @@ type gameSession struct {
 }
 
 type viewport struct {
-	x  float32
-	y  float32
-	xx float32
-	yy float32
+	x     float32
+	y     float32
+	xx    float32
+	yy    float32
+	angle float32
+	turbo bool
 }
 
 var errUserWasLogged = errors.New("user already logged")
@@ -29,8 +32,8 @@ func newGameSession(id uuid.UUID) *gameSession {
 	return &gameSession{ID: id, state: &notLoggedState{}}
 }
 
-func (s *gameSession) updateViewPort(x float32, y float32, xx float32, yy float32) {
-	s.viewport = &viewport{x: x, y: y, xx: xx, yy: xx}
+func (s *gameSession) updateViewPort(x float32, y float32, xx float32, yy float32, a float32, t bool) {
+	s.viewport = &viewport{x: x, y: y, xx: xx, yy: xx, angle: a, turbo: t}
 }
 
 type gameSessions struct {
@@ -66,7 +69,7 @@ func (s *gameSessions) viewPortRequest(ID uuid.UUID) (*viewport, error) {
 	return session.viewport, nil
 }
 
-func (s *gameSessions) UpdateViewPort(ID uuid.UUID, x float32, y float32, xx float32, yy float32) error {
+func (s *gameSessions) UpdateViewPort(ID uuid.UUID, req *messages.ViewPortRequest) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -76,7 +79,7 @@ func (s *gameSessions) UpdateViewPort(ID uuid.UUID, x float32, y float32, xx flo
 		return errCannotSendScreenUpdates
 	}
 
-	session.updateViewPort(x, y, xx, yy)
+	session.updateViewPort(req.X, req.Y, req.XX, req.YY, req.Angle, req.Turbo)
 
 	return nil
 }
