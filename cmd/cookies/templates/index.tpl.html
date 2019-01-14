@@ -223,32 +223,48 @@
     function updateCookies(game, serverCookies) {
 
         // OrderedIDs contains all ids in serverCookies ordered from low to high
-        var orderedIDs = function(cookies) {
+        var orderedIDs = function (cookies) {
             ids = [];
-            cookies.forEach(function(el) {ids.push(el.ID)});
-            return ids.sort(function(a, b) {return a - b;});
+            cookies.forEach(function (el) {
+                ids.push(el.ID)
+            });
+            return ids.sort(function (a, b) {
+                return a - b;
+            });
         }(serverCookies);
 
 
         // Positioning or removing known cookies
-        game.world.forEach(function(cookie){
-            if (cookie.custom !== undefined && cookie.custom.type==="cookie") {
+        game.world.forEach(function (cookie) {
+            if (cookie.custom !== undefined && cookie.custom.type === "cookie") {
                 // Not in list. We should disable
-                if (orderedIDs.indexOf(cookie.custom.id)===-1 && cookie.custom.id !== game.myCookie.custom.id) {
+                if (orderedIDs.indexOf(cookie.custom.id) === -1 && cookie.custom.id !== game.myCookie.custom.id) {
                     cookie.visible = false;
                     //cookie.body.destroy();
+                    console.log("removing cookie " + cookie.custom.id);
                     cookie.destroy();
-                    alert("destroyed");
+
                 } else { // In list. We should update position
                     cookie.visible = true;
-                    serverCookies.forEach(function(info) {
+                    serverCookies.forEach(function (info) {
                         if (info.ID === cookie.custom.id) {
-                            game.physics.arcade.moveToXY(cookie, info.X, info.Y, 500, gameProperties.updateClientPeriod);
+                            game.physics.arcade.moveToXY(cookie, meters2Pixels(info.X), meters2Pixels(info.Y), 50);
+                            //game.camera.follow(cookie, Phaser.Camera.FOLLOW_LOCKON, 1, 1);
+                            orderedIDs.splice(orderedIDs.indexOf(info.ID), 1);
+                            console.log(orderedIDs);
                         }
                     });
                 }
             }
         }, this, true);
+
+        orderedIDs.forEach(function (id) {
+            serverCookies.forEach(function (info) {
+                if (info.ID === id) {
+                    cookie = createCookie(game, id, info.X, info.Y, info.SC, info.AV);
+                }
+            })
+        });
 
 
         /*

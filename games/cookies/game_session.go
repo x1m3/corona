@@ -33,7 +33,7 @@ func newGameSession(id uuid.UUID) *gameSession {
 }
 
 func (s *gameSession) updateViewPort(x float32, y float32, xx float32, yy float32, a float32, t bool) {
-	s.viewport = &viewport{x: x, y: y, xx: xx, yy: xx, angle: a, turbo: t}
+	s.viewport = &viewport{x: x, y: y, xx: xx, yy: yy, angle: a, turbo: t}
 }
 
 type gameSessions struct {

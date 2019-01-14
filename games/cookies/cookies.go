@@ -211,11 +211,10 @@ func (g *Game) runSimulation(timeStep time.Duration, velocityIterations int, pos
 	allMap.UpperBound = box2d.MakeB2Vec2(g.widthX, g.widthY)
 	for {
 		t1 := time.Now()
-
 		g.worldMutex.Lock()
 
-		g.adjustSpeeds(&allMap)
 		g.world.Step(timeStep64, velocityIterations, positionIterations)
+		g.adjustSpeeds(&allMap)
 
 		g.worldMutex.Unlock()
 
