@@ -11,6 +11,7 @@ import (
 
 	"github.com/nu7hatch/gouuid"
 	"github.com/x1m3/elixir/games/cookies/messages"
+	"github.com/davecgh/go-spew/spew"
 )
 
 type Game struct {
@@ -56,13 +57,13 @@ func (g *Game) Init() {
 	go g.runSimulation(time.Duration(time.Second/time.Duration(g.fpsSimul)), 8, 2)
 }
 
-func (g *Game) NewSession() uuid.UUID {
+func (g *Game) NewSession() uint64 {
 	return g.gSessions.add()
 }
 
-func (g *Game) UserJoin(sessionID uuid.UUID, req *messages.UserJoinRequest) (*messages.UserJoinResponse, error) {
+func (g *Game) UserJoin(sessionID uint64, req *messages.UserJoinRequest) (*messages.UserJoinResponse, error) {
 
-	if err := g.gSessions.session(sessionID).login(req.Username); err!=nil {
+	if err := g.gSessions.session(sessionID).login(req.Username); err != nil {
 		return nil, err
 	}
 
@@ -70,26 +71,29 @@ func (g *Game) UserJoin(sessionID uuid.UUID, req *messages.UserJoinRequest) (*me
 	return messages.NewUserJoinResponse(true, nil), nil
 }
 
-func (g *Game) CreateCookie(sessionID uuid.UUID, req *messages.CreateCookieRequest) (*messages.CreateCookieResponse, error) {
+func (g *Game) CreateCookie(sessionID uint64, req *messages.CreateCookieRequest) (*messages.CreateCookieResponse, error) {
 
-	if err := g.gSessions.session(sessionID).startPlaying(); err != nil {
+	session := g.gSessions.session(sessionID)
+
+	if err := session.startPlaying(); err != nil {
 		return nil, err
 	}
 
-	c := &Cookie{Id: rand.Int(), SessionID: sessionID, Score: 100}
-	/*
-	x := float64(100 + rand.Intn(int(g.widthX-100)))
-	y := float64(100 + rand.Intn(int(g.widthY-100)))
-	*/
 
+
+	x := float64(300 + rand.Intn(int(g.widthX-300)))
+	y := float64(300 + rand.Intn(int(g.widthY-300)))
+
+/*
 	x := g.widthX / 2
 	y := g.widthY / 2
+*/
 	log.Printf("New cookie at position <%f, %f>\n", x, y)
-	g.addCookieToWorld(x, y, c)
-	return messages.NewCreateCookieResponse(c.Id, c.Score, float32(x), float32(y), 10), nil
+	g.addCookieToWorld(x, y, session)
+	return messages.NewCreateCookieResponse(sessionID, session.getScore(), float32(x), float32(y), 10), nil
 }
 
-func (g *Game) ViewPortRequest(sessionID uuid.UUID) (*messages.ViewportResponse, error) {
+func (g *Game) ViewPortRequest(sessionID uint64) (*messages.ViewportResponse, error) {
 
 	v, err := g.gSessions.session(sessionID).getViewport()
 	if err != nil {
@@ -108,8 +112,8 @@ func (g *Game) ViewPortRequest(sessionID uuid.UUID) (*messages.ViewportResponse,
 		response.Cookies = append(
 			response.Cookies,
 			&messages.CookieInfo{
-				ID:              ant.GetUserData().(*Cookie).Id,
-				Score:           ant.GetUserData().(*Cookie).Score,
+				ID:              ant.GetUserData().(*gameSession).ID,
+				Score:           ant.GetUserData().(*gameSession).getScore(),
 				X:               float32(pos.X),
 				Y:               float32(pos.Y),
 				AngularVelocity: float32(ant.GetAngularVelocity()),
@@ -119,7 +123,7 @@ func (g *Game) ViewPortRequest(sessionID uuid.UUID) (*messages.ViewportResponse,
 	return &response, nil
 }
 
-func (g *Game) UpdateViewPortRequest(sessionID uuid.UUID, req *messages.ViewPortRequest) {
+func (g *Game) UpdateViewPortRequest(sessionID uint64, req *messages.ViewPortRequest) {
 	g.gSessions.session(sessionID).updateViewPort(req.X, req.Y, req.XX, req.YY, req.Angle, req.Turbo)
 }
 
@@ -164,7 +168,10 @@ func (g *Game) createWorld() {
 
 }
 
-func (g *Game) addCookieToWorld(x float64, y float64, info *Cookie) *box2d.B2Body {
+func (g *Game) addCookieToWorld(x float64, y float64, session *gameSession) *box2d.B2Body {
+
+	score := session.getScore()
+
 	// Body definition
 	def := box2d.MakeB2BodyDef()
 	def.Position.Set(x, y)
@@ -175,23 +182,25 @@ func (g *Game) addCookieToWorld(x float64, y float64, info *Cookie) *box2d.B2Bod
 	def.LinearDamping = 0.0
 	def.AngularDamping = 0.0
 	def.Angle = rand.Float64() * 2 * math.Pi
-	def.AngularVelocity = float64(info.Score / 10)
+	def.AngularVelocity = float64( score/ 10)
 
 	// Shape
 	shape := box2d.MakeB2PolygonShape()
-	shape.SetAsBox(math.Sqrt(float64(info.Score)), math.Sqrt(float64(info.Score)))
+	shape.SetAsBox(math.Sqrt(float64(score)), math.Sqrt(float64(score)))
 
 	// fixture
 	fd := box2d.MakeB2FixtureDef()
 	fd.Shape = &shape
-	fd.Density = math.Sqrt(float64(info.Score))
+	fd.Density = math.Sqrt(float64(score))
 	fd.Restitution = 0.5
 	fd.Friction = 1
 
 	// Create body
 	antBody := g.world.CreateBody(&def)
-	antBody.SetUserData(info)
 	antBody.CreateFixtureFromDef(&fd)
+
+	// Save link to session
+	antBody.SetUserData(session)
 
 	return antBody
 
@@ -201,8 +210,10 @@ func (g *Game) initCookies(number int, maxX float64, maxY float64) []*box2d.B2Bo
 	bodies := make([]*box2d.B2Body, 0, number)
 
 	for i := 0; i < number; i++ {
-		uuid, _ := uuid.NewV4()
-		cookie := g.addCookieToWorld(maxX*rand.Float64(), maxY*rand.Float64(), &Cookie{Id: i, SessionID: *uuid, Score: rand.Intn(200) + 20})
+		sessionID := g.NewSession()
+		_, err := g.UserJoin(sessionID, &messages.UserJoinRequest{Username:"manolo"})
+		spew.Dump(err)
+		cookie := g.addCookieToWorld(maxX*rand.Float64(), maxY*rand.Float64(), g.gSessions.session(sessionID))
 		bodies = append(bodies, cookie)
 	}
 	return bodies
@@ -240,10 +251,11 @@ func (g *Game) adjustSpeeds(allMap *box2d.B2AABB) {
 			info := body.GetUserData()
 
 			switch info.(type) {
-			case *Cookie:
+			// If it is a gameSession, then, it's a cookie
+			case *gameSession:
 				// Angular speed
 				currentSpeed := body.M_angularVelocity
-				expectedSpeed := float64(info.(*Cookie).Score / 10)
+				expectedSpeed := float64(info.(*gameSession).getScore() / 10)
 
 				var linearSpeedPenalty float64 = 0
 
@@ -287,9 +299,9 @@ func (g *Game) adjustSpeeds(allMap *box2d.B2AABB) {
 
 }
 
-func (g *Game) viewPort(v *viewport) map[int]*box2d.B2Body {
+func (g *Game) viewPort(v *viewport) map[uint64]*box2d.B2Body {
 
-	cookies := make(map[int]*box2d.B2Body, 0)
+	cookies := make(map[uint64]*box2d.B2Body, 0)
 
 	g.worldMutex.RLock()
 
@@ -297,8 +309,8 @@ func (g *Game) viewPort(v *viewport) map[int]*box2d.B2Body {
 		func(fixture *box2d.B2Fixture) bool {
 			info := fixture.M_body.GetUserData()
 			switch info.(type) {
-			case *Cookie:
-				cookies[info.(*Cookie).Id] = fixture.M_body
+			case *gameSession:
+				cookies[info.(*gameSession).ID] = fixture.M_body
 			}
 			return true
 		},

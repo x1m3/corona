@@ -45,12 +45,12 @@ type ViewPortRequest struct {
 
 type ViewportResponse struct {
 	BaseMessage
-	Cookies []*CookieInfo  `json:"C"`
+	Cookies []*CookieInfo `json:"C"`
 }
 
 type CookieInfo struct {
-	ID              int     `json:"ID"`
-	Score           int     `json:"SC"`
+	ID              uint64  `json:"ID"`
+	Score           uint64  `json:"SC"`
 	X               float32 `json:"X"`
 	Y               float32 `json:"Y"`
 	AngularVelocity float32 `json:"AV"`
@@ -61,7 +61,7 @@ type CreateCookieResponse struct {
 	Data CookieInfo `json:"d"`
 }
 
-func NewCreateCookieResponse(ID int, sc int, X float32, Y float32, AngularVelocity float32) *CreateCookieResponse {
+func NewCreateCookieResponse(ID uint64, sc uint64, X float32, Y float32, AngularVelocity float32) *CreateCookieResponse {
 	resp := &CreateCookieResponse{
 		Data: CookieInfo{
 			ID:              ID,

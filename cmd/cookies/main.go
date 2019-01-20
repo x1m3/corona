@@ -10,7 +10,6 @@ import (
 	"github.com/gorilla/websocket"
 	"log"
 	"github.com/x1m3/elixir/games/cookies"
-	"github.com/nu7hatch/gouuid"
 
 	"github.com/x1m3/elixir/games/cookies/codec/json"
 	"github.com/x1m3/elixir/games/cookies/messages"
@@ -110,7 +109,7 @@ func wsAction(resp http.ResponseWriter, req *http.Request) {
 	log.Println("New Connection")
 }
 
-func manageRemoteView(transport *cookies.Transport, sessionID uuid.UUID, updatePeriod time.Duration) {
+func manageRemoteView(transport *cookies.Transport, sessionID uint64, updatePeriod time.Duration) {
 
 	for {
 		time.Sleep(updatePeriod)
@@ -129,7 +128,7 @@ func manageRemoteView(transport *cookies.Transport, sessionID uuid.UUID, updateP
 	}
 }
 
-func handleWSRequests(transport *cookies.Transport, sessionID uuid.UUID) {
+func handleWSRequests(transport *cookies.Transport, sessionID uint64) {
 	var resp messages.Message
 	var errResp error
 

@@ -1,15 +1,16 @@
 package cookies
 
 import (
-	"github.com/nu7hatch/gouuid"
 	"sync"
 	"github.com/pkg/errors"
+	"math/rand"
 )
 
 type gameSession struct {
 	sync.RWMutex
-	ID       uuid.UUID
+	ID       uint64
 	userName string
+	score    uint64 // TODO: score should be an atomic counter
 	logged   bool
 	state    state
 	viewport *viewport
@@ -27,8 +28,8 @@ type viewport struct {
 var errUserWasLogged = errors.New("user already logged")
 var errCannotSendScreenUpdates = errors.New("session not found")
 
-func newGameSession(id uuid.UUID) *gameSession {
-	return &gameSession{ID: id, state: &notLoggedState{}}
+func newGameSession(id uint64) *gameSession {
+	return &gameSession{ID: id, state: &notLoggedState{}, score: 100}
 }
 
 func (s *gameSession) getViewport() (*viewport, error) {
@@ -50,8 +51,7 @@ func (s *gameSession) updateViewPort(x float32, y float32, xx float32, yy float3
 	s.Unlock()
 }
 
-
-func (s *gameSession) login(username string) error{
+func (s *gameSession) login(username string) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -77,31 +77,39 @@ func (s *gameSession) startPlaying() error {
 	return nil
 }
 
+func (s *gameSession) getScore() uint64 {
+	s.RLock()
+	sc := s.score
+	s.RUnlock()
+
+	return sc
+}
+
 type gameSessions struct {
 	sync.RWMutex
-	sessions map[uuid.UUID]*gameSession
+	sessions map[uint64]*gameSession
 }
 
 func newGameSessions() *gameSessions {
 	return &gameSessions{
-		sessions: make(map[uuid.UUID]*gameSession),
+		sessions: make(map[uint64]*gameSession),
 	}
 }
 
-func (s *gameSessions) add() uuid.UUID {
-	ID, _ := uuid.NewV4()
+func (s *gameSessions) add() uint64 {
+	ID := rand.Uint64() << 8// Javascript does not support number larger than 57 bits. Let's avoid problems.
 	s.Lock()
-	s.sessions[*ID] = newGameSession(*ID)
+	s.sessions[ID] = newGameSession(ID)
 	s.Unlock()
-	return *ID
+	return ID
 }
 
-func (s *gameSessions) session(id uuid.UUID) *gameSession {
+func (s *gameSessions) session(id uint64) *gameSession {
 	s.RLock()
 	defer s.RUnlock()
 	return s.sessions[id]
 }
 
-func (s *gameSessions) StartPlaying(ID uuid.UUID) error {
+func (s *gameSessions) StartPlaying(ID uint64) error {
 	return s.session(ID).startPlaying()
 }
