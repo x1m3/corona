@@ -4,11 +4,10 @@ import (
 	"github.com/nu7hatch/gouuid"
 	"sync"
 	"github.com/pkg/errors"
-	"fmt"
-	"github.com/x1m3/elixir/games/cookies/messages"
 )
 
 type gameSession struct {
+	sync.RWMutex
 	ID       uuid.UUID
 	userName string
 	logged   bool
@@ -32,8 +31,50 @@ func newGameSession(id uuid.UUID) *gameSession {
 	return &gameSession{ID: id, state: &notLoggedState{}}
 }
 
+func (s *gameSession) getViewport() (*viewport, error) {
+	s.RLock()
+	defer s.RUnlock()
+
+	if !s.state.canSendScreenUpdates() || s.viewport == nil {
+		return nil, errCannotSendScreenUpdates
+	}
+
+	return s.viewport, nil
+}
+
 func (s *gameSession) updateViewPort(x float32, y float32, xx float32, yy float32, a float32, t bool) {
-	s.viewport = &viewport{x: x, y: y, xx: xx, yy: yy, angle: a, turbo: t}
+	s.Lock()
+	if s.state.canSendScreenUpdates() {
+		s.viewport = &viewport{x: x, y: y, xx: xx, yy: yy, angle: a, turbo: t}
+	}
+	s.Unlock()
+}
+
+
+func (s *gameSession) login(username string) error{
+	s.Lock()
+	defer s.Unlock()
+
+	if s.logged {
+		return errUserWasLogged
+	}
+	s.state = &loggedState{}
+	s.userName = username
+	s.logged = true
+
+	return nil
+}
+
+func (s *gameSession) startPlaying() error {
+	s.Lock()
+	defer s.Unlock()
+
+	if _, ok := s.state.(*loggedState); !ok {
+		return errors.New("not logged user wants to play")
+	}
+	s.state = &playingState{}
+
+	return nil
 }
 
 type gameSessions struct {
@@ -55,61 +96,12 @@ func (s *gameSessions) add() uuid.UUID {
 	return *ID
 }
 
-func (s *gameSessions) viewPortRequest(ID uuid.UUID) (*viewport, error) {
+func (s *gameSessions) session(id uuid.UUID) *gameSession {
 	s.RLock()
 	defer s.RUnlock()
-
-	session := s.sessions[ID] // Always should exist.
-	viewport := session.viewport
-
-	if !session.state.canSendScreenUpdates() || viewport == nil {
-		return nil, errCannotSendScreenUpdates
-	}
-
-	return session.viewport, nil
-}
-
-func (s *gameSessions) UpdateViewPort(ID uuid.UUID, req *messages.ViewPortRequest) error {
-	s.Lock()
-	defer s.Unlock()
-
-	session := s.sessions[ID] // Always should exist.
-
-	if !session.state.canSendScreenUpdates() {
-		return errCannotSendScreenUpdates
-	}
-
-	session.updateViewPort(req.X, req.Y, req.XX, req.YY, req.Angle, req.Turbo)
-
-	return nil
-}
-
-func (s *gameSessions) Login(ID uuid.UUID, username string) error {
-	s.Lock()
-	defer s.Unlock()
-
-	session := s.sessions[ID]
-	if session.logged {
-		return errUserWasLogged
-	}
-
-	session.state = &loggedState{}
-	session.userName = username
-	session.logged = true
-
-	return nil
+	return s.sessions[id]
 }
 
 func (s *gameSessions) StartPlaying(ID uuid.UUID) error {
-	s.Lock()
-	defer s.Unlock()
-
-	session := s.sessions[ID]
-	if _, ok := session.state.(*loggedState); !ok {
-		return fmt.Errorf("not logged user wants to play")
-	}
-
-	session.state = &playingState{}
-
-	return nil
+	return s.session(ID).startPlaying()
 }

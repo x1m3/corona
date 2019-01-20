@@ -62,8 +62,7 @@ func (g *Game) NewSession() uuid.UUID {
 
 func (g *Game) UserJoin(sessionID uuid.UUID, req *messages.UserJoinRequest) (*messages.UserJoinResponse, error) {
 
-	err := g.gSessions.Login(sessionID, req.Username)
-	if err != nil {
+	if err := g.gSessions.session(sessionID).login(req.Username); err!=nil {
 		return nil, err
 	}
 
@@ -73,20 +72,26 @@ func (g *Game) UserJoin(sessionID uuid.UUID, req *messages.UserJoinRequest) (*me
 
 func (g *Game) CreateCookie(sessionID uuid.UUID, req *messages.CreateCookieRequest) (*messages.CreateCookieResponse, error) {
 
-	if err := g.gSessions.StartPlaying(sessionID); err != nil {
+	if err := g.gSessions.session(sessionID).startPlaying(); err != nil {
 		return nil, err
 	}
 
 	c := &Cookie{Id: rand.Int(), SessionID: sessionID, Score: 100}
+	/*
 	x := float64(100 + rand.Intn(int(g.widthX-100)))
 	y := float64(100 + rand.Intn(int(g.widthY-100)))
+	*/
+
+	x := g.widthX / 2
+	y := g.widthY / 2
+	log.Printf("New cookie at position <%f, %f>\n", x, y)
 	g.addCookieToWorld(x, y, c)
 	return messages.NewCreateCookieResponse(c.Id, c.Score, float32(x), float32(y), 10), nil
 }
 
 func (g *Game) ViewPortRequest(sessionID uuid.UUID) (*messages.ViewportResponse, error) {
 
-	v, err := g.gSessions.viewPortRequest(sessionID)
+	v, err := g.gSessions.session(sessionID).getViewport()
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +120,7 @@ func (g *Game) ViewPortRequest(sessionID uuid.UUID) (*messages.ViewportResponse,
 }
 
 func (g *Game) UpdateViewPortRequest(sessionID uuid.UUID, req *messages.ViewPortRequest) {
-	g.gSessions.UpdateViewPort(sessionID, req)
+	g.gSessions.session(sessionID).updateViewPort(req.X, req.Y, req.XX, req.YY, req.Angle, req.Turbo)
 }
 
 func (g *Game) EventListener() <-chan pubsub.Event {

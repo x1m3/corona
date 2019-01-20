@@ -205,6 +205,16 @@
         cookie.height = meters2Pixels(1.3 * 2 * Math.sqrt(score));
         cookie.maxAngular = 100000;
         cookie.angularDrag = 0;
+
+        // Text
+        var style = { font: "24px Arial", fill: "#ffffaa", wordWrap: true, wordWrapWidth: cookie.width, align: "center", backgroundColor: "#111111" };
+        cookie.custom.label = game.add.text(meters2Pixels(x), meters2Pixels(y), cookie.custom.id + '\n(' + Math.floor(cookie.x) + ', ' + Math.floor(cookie.y) + ')', style);
+        cookie.custom.label.anchor.set(0.5);
+        cookie.custom.label.alpha = 0.7;
+
+
+
+
         cookie.visible = true;
         /*
         var filter = game.add.filter('Gray');
@@ -242,16 +252,22 @@
                     cookie.visible = false;
                     //cookie.body.destroy();
                     console.log("removing cookie " + cookie.custom.id);
+                    cookie.custom.label.destroy();
                     cookie.destroy();
 
                 } else { // In list. We should update position
                     cookie.visible = true;
                     serverCookies.forEach(function (info) {
                         if (info.ID === cookie.custom.id) {
-                            game.physics.arcade.moveToXY(cookie, meters2Pixels(info.X), meters2Pixels(info.Y), 50);
-                            //game.camera.follow(cookie, Phaser.Camera.FOLLOW_LOCKON, 1, 1);
+                            game.physics.arcade.moveToXY(cookie, meters2Pixels(info.X), meters2Pixels(info.Y), 250, 1 * 1000 * gameProperties.updateClientPeriod);
+                            cookie.body.angularVelocity = 100 * info.AV;
+
+
+                            cookie.custom.label.x = meters2Pixels(info.X);
+                            cookie.custom.label.y = meters2Pixels(info.Y) + cookie.body.height/2 + 50;
+
                             orderedIDs.splice(orderedIDs.indexOf(info.ID), 1);
-                            console.log(orderedIDs);
+
                         }
                     });
                 }
