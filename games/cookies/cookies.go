@@ -9,7 +9,6 @@ import (
 	"sync"
 	"log"
 
-	"github.com/nu7hatch/gouuid"
 	"github.com/x1m3/elixir/games/cookies/messages"
 	"github.com/davecgh/go-spew/spew"
 	"sync/atomic"
@@ -28,30 +27,34 @@ type Game struct {
 	events       chan pubsub.Event
 	speed        int
 	turboSpeed   int
-	maxFoodCount int
-	foodCount    uint
+	maxFoodCount uint64
+	foodCount    uint64
 }
 
 type Cookie struct {
-	Id        int
-	SessionID uuid.UUID
-	Score     int
+	ID    int
+	Score int
+}
+
+type Food struct {
+	ID    uint64
+	Score int
 }
 
 // New returns a new cookies game.
 func New(widthX, widthY float64, nAnts int) *Game {
 
 	return &Game{
-		gSessions:  newGameSessions(),
-		world:      box2d.MakeB2World(box2d.MakeB2Vec2(0, 0)),
-		fpsSimul:   45,
-		fps:        10,
-		nAnts:      nAnts,
-		widthX:     widthX,
-		widthY:     widthY,
-		events:     make(chan pubsub.Event, 10000),
-		speed:      40,
-		turboSpeed: 65,
+		gSessions:    newGameSessions(),
+		world:        box2d.MakeB2World(box2d.MakeB2Vec2(0, 0)),
+		fpsSimul:     45,
+		fps:          10,
+		nAnts:        nAnts,
+		widthX:       widthX,
+		widthY:       widthY,
+		events:       make(chan pubsub.Event, 10000),
+		speed:        40,
+		turboSpeed:   65,
 		maxFoodCount: 1000,
 	}
 }
@@ -102,12 +105,14 @@ func (g *Game) ViewPortRequest(sessionID uint64) (*messages.ViewportResponse, er
 		return nil, err
 	}
 
-	cookies := g.viewPort(v)
+	cookies, food := g.viewPort(v)
 
 	response := messages.ViewportResponse{}
 	response.Type = messages.ViewPortResponseType
 
 	response.Cookies = make([]*messages.CookieInfo, 0, len(cookies))
+	response.Food = make([]*messages.FoodInfo, 0, len(food))
+
 	g.worldMutex.RLock()
 	for _, ant := range cookies {
 		pos := ant.GetPosition()
@@ -121,7 +126,19 @@ func (g *Game) ViewPortRequest(sessionID uint64) (*messages.ViewportResponse, er
 				AngularVelocity: float32(ant.GetAngularVelocity()),
 			})
 	}
+	for _, f := range food {
+		pos := f.GetPosition()
+		response.Food = append(
+			response.Food,
+			&messages.FoodInfo{
+				ID:    f.GetUserData().(*Food).ID,
+				Score: f.GetUserData().(*Food).Score,
+				X:     float32(pos.X),
+				Y:     float32(pos.Y),
+			})
+	}
 	g.worldMutex.RUnlock()
+
 	return &response, nil
 }
 
@@ -171,7 +188,7 @@ func (g *Game) createWorld() {
 
 func (g *Game) addCookieToWorld(x float64, y float64, session *gameSession) *box2d.B2Body {
 
-	score := session.getScore()
+	score := 100
 
 	// Body definition
 	def := box2d.MakeB2BodyDef()
@@ -183,7 +200,7 @@ func (g *Game) addCookieToWorld(x float64, y float64, session *gameSession) *box
 	def.LinearDamping = 1.0
 	def.AngularDamping = 0.0
 	def.Angle = rand.Float64() * 2 * math.Pi
-	def.AngularVelocity = float64(score / 10)
+	def.AngularVelocity = 10
 
 	// Shape
 	shape := box2d.MakeB2PolygonShape()
@@ -200,13 +217,38 @@ func (g *Game) addCookieToWorld(x float64, y float64, session *gameSession) *box
 	g.worldMutex.Lock()
 	antBody := g.world.CreateBody(&def)
 	g.worldMutex.Unlock()
+
 	antBody.CreateFixtureFromDef(&fd)
 
 	// Save link to session
 	antBody.SetUserData(session)
 
 	return antBody
+}
 
+func (g *Game) addFoodToWorld(x, y float64, score int) {
+	def := box2d.MakeB2BodyDef()
+	def.Position.Set(x, y)
+	def.Type = box2d.B2BodyType.B2_staticBody
+	def.FixedRotation = true
+	def.AllowSleep = true
+
+	// Shape
+	shape := box2d.MakeB2CircleShape()
+	shape.M_radius = 1
+
+	// fixture
+	fd := box2d.MakeB2FixtureDef()
+	fd.Shape = &shape
+
+	// Create body
+	g.worldMutex.Lock()
+	antBody := g.world.CreateBody(&def)
+	g.worldMutex.Unlock()
+	antBody.CreateFixtureFromDef(&fd)
+
+	// Save link to session
+	antBody.SetUserData(&Food{ID: rand.Uint64() << 8, Score: score})
 }
 
 func (g *Game) initCookies(number int, maxX float64, maxY float64) {
@@ -220,22 +262,28 @@ func (g *Game) initCookies(number int, maxX float64, maxY float64) {
 		g.gSessions.session(sessionID).setBox2DBody(cookie)
 		g.gSessions.session(sessionID).state = &playingState{}
 	}
-
 }
 
 func (g *Game) runSimulation(timeStep time.Duration, velocityIterations int, positionIterations int) {
 	timeStep64 := float64(timeStep) / float64(time.Second)
 
+	foodTimer := time.NewTimer(2 * time.Second)
+	go func() {
+		<-foodTimer.C
+		g.adjustFood()
+	}()
+
+	/*
 	allMap := box2d.MakeB2AABB()
 	allMap.LowerBound = box2d.MakeB2Vec2(0, 0)
 	allMap.UpperBound = box2d.MakeB2Vec2(g.widthX, g.widthY)
+	*/
 	for {
 		t1 := time.Now()
 		g.worldMutex.Lock()
 
 		g.world.Step(timeStep64, velocityIterations, positionIterations)
 		g.adjustSpeeds()
-		//g.adjustFood()
 
 		g.worldMutex.Unlock()
 
@@ -287,9 +335,23 @@ func (g *Game) adjustSpeeds() {
 	})
 }
 
-func (g *Game) viewPort(v *viewport) map[uint64]*box2d.B2Body {
+func (g *Game) adjustFood() {
+	const N = 100
 
-	cookies := make(map[uint64]*box2d.B2Body, 0)
+	foodCount := atomic.LoadUint64(&g.foodCount)
+
+	if foodCount < g.maxFoodCount {
+		for i := 0; i < N; i++ {
+			g.addFoodToWorld(float64(300+rand.Intn(int(g.widthX-300))), float64(300+rand.Intn(int(g.widthX-300))), 5)
+		}
+	}
+	atomic.AddUint64(&g.foodCount, N)
+}
+
+func (g *Game) viewPort(v *viewport) ([]*box2d.B2Body, []*box2d.B2Body) {
+
+	cookies := make([]*box2d.B2Body, 0)
+	food := make([]*box2d.B2Body, 0)
 
 	g.worldMutex.RLock()
 
@@ -298,7 +360,9 @@ func (g *Game) viewPort(v *viewport) map[uint64]*box2d.B2Body {
 			info := fixture.M_body.GetUserData()
 			switch info.(type) {
 			case *gameSession:
-				cookies[info.(*gameSession).ID] = fixture.M_body
+				cookies = append(cookies, fixture.M_body)
+			case *Food:
+				food = append(food, fixture.M_body)
 			}
 			return true
 		},
@@ -308,5 +372,5 @@ func (g *Game) viewPort(v *viewport) map[uint64]*box2d.B2Body {
 
 	g.worldMutex.RUnlock()
 
-	return cookies
+	return cookies, food
 }

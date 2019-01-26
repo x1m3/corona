@@ -46,6 +46,7 @@ type ViewPortRequest struct {
 type ViewportResponse struct {
 	BaseMessage
 	Cookies []*CookieInfo `json:"C"`
+	Food    []*FoodInfo   `json:"F"`
 }
 
 type CookieInfo struct {
@@ -54,6 +55,13 @@ type CookieInfo struct {
 	X               float32 `json:"X"`
 	Y               float32 `json:"Y"`
 	AngularVelocity float32 `json:"AV"`
+}
+
+type FoodInfo struct {
+	ID    uint64  `json:"ID"`
+	Score int     `json:"SC"`
+	X     float32 `json:"X"`
+	Y     float32 `json:"Y"`
 }
 
 type CreateCookieResponse struct {
