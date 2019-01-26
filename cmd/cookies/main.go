@@ -20,7 +20,7 @@ const (
 	pixels2Meters              = 10
 	gameWidthMeters            = 2000
 	gameHeightMeters           = 2000
-	NumCookies                 = 500
+	NumCookies                 = 100
 	virtualHost                = ""
 	port                       = 8000
 	serverHTTPReadTimeOut      = 30 * time.Second // Maximum time to read the full http request

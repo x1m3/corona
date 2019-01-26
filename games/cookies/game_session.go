@@ -4,6 +4,7 @@ import (
 	"sync"
 	"github.com/pkg/errors"
 	"math/rand"
+	"github.com/ByteArena/box2d"
 )
 
 type gameSession struct {
@@ -14,6 +15,7 @@ type gameSession struct {
 	logged   bool
 	state    state
 	viewport *viewport
+	box2dbody *box2d.B2Body
 }
 
 type viewport struct {
@@ -85,6 +87,22 @@ func (s *gameSession) getScore() uint64 {
 	return sc
 }
 
+
+func (s *gameSession) setBox2DBody(b *box2d.B2Body) {
+	s.Lock()
+	s.box2dbody = b
+	s.Unlock()
+}
+
+func (s *gameSession) getBox2DBody() *box2d.B2Body {
+	s.RLock()
+	defer s.RUnlock()
+	return s.box2dbody
+}
+
+
+
+
 type gameSessions struct {
 	sync.RWMutex
 	sessions map[uint64]*gameSession
@@ -112,4 +130,14 @@ func (s *gameSessions) session(id uint64) *gameSession {
 
 func (s *gameSessions) StartPlaying(ID uint64) error {
 	return s.session(ID).startPlaying()
+}
+
+func (s *gameSessions) each(fn func(s *gameSession) bool) {
+	s.Lock()
+	defer s.Unlock()
+	for _, session := range s.sessions {
+		if !fn(session) {
+			return
+		}
+	}
 }

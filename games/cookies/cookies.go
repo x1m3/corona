@@ -12,21 +12,24 @@ import (
 	"github.com/nu7hatch/gouuid"
 	"github.com/x1m3/elixir/games/cookies/messages"
 	"github.com/davecgh/go-spew/spew"
+	"sync/atomic"
 )
 
 type Game struct {
 	worldMutex sync.RWMutex
 	gSessions  *gameSessions
 
-	world      box2d.B2World
-	fpsSimul   float64
-	fps        float64
-	widthX     float64
-	widthY     float64
-	nAnts      int
-	events     chan pubsub.Event
-	speed      int
-	turboSpeed int
+	world        box2d.B2World
+	fpsSimul     float64
+	fps          float64
+	widthX       float64
+	widthY       float64
+	nAnts        int
+	events       chan pubsub.Event
+	speed        int
+	turboSpeed   int
+	maxFoodCount int
+	foodCount    uint
 }
 
 type Cookie struct {
@@ -47,8 +50,9 @@ func New(widthX, widthY float64, nAnts int) *Game {
 		widthX:     widthX,
 		widthY:     widthY,
 		events:     make(chan pubsub.Event, 10000),
-		speed:      25,
-		turboSpeed: 40,
+		speed:      40,
+		turboSpeed: 65,
+		maxFoodCount: 1000,
 	}
 }
 
@@ -79,17 +83,15 @@ func (g *Game) CreateCookie(sessionID uint64, req *messages.CreateCookieRequest)
 		return nil, err
 	}
 
-
-
 	x := float64(300 + rand.Intn(int(g.widthX-300)))
 	y := float64(300 + rand.Intn(int(g.widthY-300)))
 
-/*
-	x := g.widthX / 2
-	y := g.widthY / 2
-*/
+	/*
+		x := g.widthX / 2
+		y := g.widthY / 2
+	*/
 	log.Printf("New cookie at position <%f, %f>\n", x, y)
-	g.addCookieToWorld(x, y, session)
+	session.setBox2DBody(g.addCookieToWorld(x, y, session))
 	return messages.NewCreateCookieResponse(sessionID, session.getScore(), float32(x), float32(y), 10), nil
 }
 
@@ -165,7 +167,6 @@ func (g *Game) createWorld() {
 	createWorldBoundary(&g.world, g.widthX, g.widthY/2, 0.1, g.widthY, true)
 
 	g.initCookies(g.nAnts, g.widthX, g.widthY)
-
 }
 
 func (g *Game) addCookieToWorld(x float64, y float64, session *gameSession) *box2d.B2Body {
@@ -179,10 +180,10 @@ func (g *Game) addCookieToWorld(x float64, y float64, session *gameSession) *box
 	def.FixedRotation = false
 	def.AllowSleep = true
 	def.LinearVelocity = box2d.MakeB2Vec2(float64(rand.Intn(g.speed)-10), float64(rand.Intn(g.speed)-10))
-	def.LinearDamping = 0.0
+	def.LinearDamping = 1.0
 	def.AngularDamping = 0.0
 	def.Angle = rand.Float64() * 2 * math.Pi
-	def.AngularVelocity = float64( score/ 10)
+	def.AngularVelocity = float64(score / 10)
 
 	// Shape
 	shape := box2d.MakeB2PolygonShape()
@@ -191,12 +192,14 @@ func (g *Game) addCookieToWorld(x float64, y float64, session *gameSession) *box
 	// fixture
 	fd := box2d.MakeB2FixtureDef()
 	fd.Shape = &shape
-	fd.Density = math.Sqrt(float64(score))
-	fd.Restitution = 0.5
-	fd.Friction = 1
+	fd.Density = 10 * math.Sqrt(float64(score))
+	fd.Restitution = 0.7
+	fd.Friction = 0.1
 
 	// Create body
+	g.worldMutex.Lock()
 	antBody := g.world.CreateBody(&def)
+	g.worldMutex.Unlock()
 	antBody.CreateFixtureFromDef(&fd)
 
 	// Save link to session
@@ -206,17 +209,18 @@ func (g *Game) addCookieToWorld(x float64, y float64, session *gameSession) *box
 
 }
 
-func (g *Game) initCookies(number int, maxX float64, maxY float64) []*box2d.B2Body {
-	bodies := make([]*box2d.B2Body, 0, number)
+func (g *Game) initCookies(number int, maxX float64, maxY float64) {
 
 	for i := 0; i < number; i++ {
 		sessionID := g.NewSession()
-		_, err := g.UserJoin(sessionID, &messages.UserJoinRequest{Username:"manolo"})
+		_, err := g.UserJoin(sessionID, &messages.UserJoinRequest{Username: "manolo"})
 		spew.Dump(err)
 		cookie := g.addCookieToWorld(maxX*rand.Float64(), maxY*rand.Float64(), g.gSessions.session(sessionID))
-		bodies = append(bodies, cookie)
+		// TODO: Refactor.. use a function!!!!
+		g.gSessions.session(sessionID).setBox2DBody(cookie)
+		g.gSessions.session(sessionID).state = &playingState{}
 	}
-	return bodies
+
 }
 
 func (g *Game) runSimulation(timeStep time.Duration, velocityIterations int, positionIterations int) {
@@ -230,7 +234,8 @@ func (g *Game) runSimulation(timeStep time.Duration, velocityIterations int, pos
 		g.worldMutex.Lock()
 
 		g.world.Step(timeStep64, velocityIterations, positionIterations)
-		g.adjustSpeeds(&allMap)
+		g.adjustSpeeds()
+		//g.adjustFood()
 
 		g.worldMutex.Unlock()
 
@@ -243,60 +248,43 @@ func (g *Game) runSimulation(timeStep time.Duration, velocityIterations int, pos
 	}
 }
 
-func (g *Game) adjustSpeeds(allMap *box2d.B2AABB) {
+func (g *Game) adjustSpeeds() {
 
-	g.world.QueryAABB(
-		func(fixture *box2d.B2Fixture) bool {
-			body := fixture.M_body
-			info := body.GetUserData()
+	g.gSessions.each(func(session *gameSession) bool {
 
-			switch info.(type) {
-			// If it is a gameSession, then, it's a cookie
-			case *gameSession:
-				// Angular speed
-				currentSpeed := body.M_angularVelocity
-				expectedSpeed := float64(info.(*gameSession).getScore() / 10)
-
-				var linearSpeedPenalty float64 = 0
-
-				if currentSpeed <= 0 {
-					body.SetAngularVelocity(currentSpeed + (expectedSpeed+math.Abs(currentSpeed))/50)
-				} else {
-					if currentSpeed < expectedSpeed {
-						body.SetAngularVelocity(currentSpeed + (expectedSpeed-currentSpeed)/50)
-					} else {
-						body.SetAngularVelocity(currentSpeed - (currentSpeed-expectedSpeed)/50)
-					}
-					linearSpeedPenalty = currentSpeed / expectedSpeed /// Could be positive if it is spinning faster ;-)
-				}
-
-				// Linear speed, based on configuration, but also on spining angular speed.
-				speedX := body.GetLinearVelocity().X
-				speedY := body.GetLinearVelocity().Y
-				if math.Abs(speedX) < 1.0 {
-					speedX = 1.0
-				}
-				if math.Abs(speedY) < 1.0 {
-					speedY = 1.0
-				}
-				currentSpeed = math.Sqrt(math.Pow(speedX, 2) + math.Pow(speedY, 2))
-				expectedSpeed = linearSpeedPenalty * float64(g.speed)
-
-				offsetX := speedX / 20
-				offsetY := speedY / 20
-
-				if currentSpeed < expectedSpeed {
-					body.SetLinearVelocity(box2d.MakeB2Vec2(speedX+offsetX, speedY+offsetY))
-				} else {
-					body.SetLinearVelocity(box2d.MakeB2Vec2(speedX-offsetX, speedY-offsetY))
-				}
-
-			}
+		if _, ok := session.state.(*playingState); !ok {
 			return true
-		},
-		*allMap,
-	)
+		}
+		body := session.box2dbody
+		inertia := body.GetInertia()
 
+		// Angular speed
+		currentSpeed := body.M_angularVelocity
+		expectedSpeed := float64(session.getScore() / 10)
+		body.ApplyTorque(inertia*(expectedSpeed-currentSpeed)/2, true)
+
+		if session.viewport == nil {
+			return true
+		}
+
+		// Linear speed, based on configuration, but also on spinning angular speed.
+		speedX := body.GetLinearVelocity().X
+		speedY := body.GetLinearVelocity().Y
+		currentSpeed = math.Sqrt(math.Pow(speedX, 2) + math.Pow(speedY, 2))
+		expectedSpeed = float64(g.speed)
+
+		// Consider adding a moving average here to smooth movements
+		magnitude := 1 * (expectedSpeed - currentSpeed) * inertia
+
+		vector := box2d.MakeB2Vec2(math.Cos(float64(session.viewport.angle)), math.Sin(float64(session.viewport.angle)))
+		if magnitude < 0 {
+			magnitude *= 0.005
+		}
+		vector.OperatorScalarMulInplace(magnitude)
+		body.ApplyForce(vector, body.GetPosition(), true)
+
+		return true
+	})
 }
 
 func (g *Game) viewPort(v *viewport) map[uint64]*box2d.B2Body {
