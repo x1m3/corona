@@ -15,26 +15,26 @@ func (l *contactListener) BeginContact(contact box2d.B2ContactInterface) {
 	data1 := body1.GetUserData()
 	data2 := body2.GetUserData()
 
-	// Collission between cookies
+	// Contact between cookies
 	if cookie1, isACookie := data1.(*Cookie); isACookie {
 		if cookie2, isACookie := data2.(*Cookie); isACookie {
-			l.collisionBetweenCookies(cookie1, cookie2)
+			l.contactBetweenCookies(cookie1, cookie2)
 			return
 		}
 	}
 
-	// Collission between cookie and food
+	// Contact between cookie and food
 	if cookie, isACookie := data1.(*Cookie); isACookie {
 		if food, isFood := data2.(*Food); isFood {
-			l.collisionBetweenCookiesAndFood(cookie, food)
+			l.contactBetweenCookiesAndFood(cookie, food)
 			return
 		}
 	}
 
-	// Collission between food and cookie
+	// Contact between food and cookie
 	if food, isFood := data1.(*Food); isFood {
 		if cookie, isACookie := data2.(*Cookie); isACookie {
-			l.collisionBetweenCookiesAndFood(cookie, food)
+			l.contactBetweenCookiesAndFood(cookie, food)
 			return
 		}
 	}
@@ -52,11 +52,11 @@ func (l *contactListener) PostSolve(contact box2d.B2ContactInterface, impulse *b
 	return
 }
 
-func (l *contactListener) collisionBetweenCookies(cookie1 *Cookie, cookie2 *Cookie) {
+func (l *contactListener) contactBetweenCookies(cookie1 *Cookie, cookie2 *Cookie) {
 	log.Printf("Collission between cookies <%d> and <%d>", cookie1.ID, cookie2.ID)
 }
 
-func (l *contactListener) collisionBetweenCookiesAndFood(cookie *Cookie, food *Food) {
+func (l *contactListener) contactBetweenCookiesAndFood(cookie *Cookie, food *Food) {
 	log.Printf("Collission between cookie<%d> and food <%d>", cookie.ID, food.ID)
 }
 
