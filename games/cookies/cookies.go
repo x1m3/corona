@@ -1,17 +1,16 @@
 package cookies
 
 import (
-	"fmt"
-	"github.com/x1m3/elixir/pubsub"
 	"github.com/ByteArena/box2d"
-	"math/rand"
-	"time"
-	"math"
-	"sync"
+	"github.com/x1m3/elixir/pubsub"
 	"log"
+	"math"
+	"math/rand"
+	"sync"
+	"time"
 
-	"github.com/x1m3/elixir/games/cookies/messages"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/x1m3/elixir/games/cookies/messages"
 	"sync/atomic"
 )
 

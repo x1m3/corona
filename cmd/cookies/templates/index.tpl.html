@@ -179,8 +179,8 @@
             game.transport.registerCallback(
                     ViewPortResponseType,
                     function (msg) {
-                        console.log(msg);
                         updateCookies(game, msg.C);
+                        updateFood(game, msg.F);
                     }
             );
 
@@ -194,7 +194,7 @@
     };
 
     function createCookie(game, id, x, y, score, angularVelocity) {
-        cookie = game.add.sprite(meters2Pixels(x), meters2Pixels(y), "firefox");
+        var cookie = game.add.sprite(meters2Pixels(x), meters2Pixels(y), "firefox");
         cookie.custom = {};
         cookie.custom.id = id;
         cookie.custom.score = score;
@@ -212,9 +212,6 @@
         cookie.custom.label.anchor.set(0.5);
         cookie.custom.label.alpha = 0.7;
 
-
-
-
         cookie.visible = true;
         /*
         var filter = game.add.filter('Gray');
@@ -227,28 +224,34 @@
         cookie.body.angularVelocity = 10 * angularVelocity;
 
         return cookie;
-    };
+    }
 
+    function createFood(game, id, x, y, score) {
+        var food = game.add.sprite(meters2Pixels(x), meters2Pixels(y), "cookie1");
+        food.custom = {};
+        food.custom.id = id;
+        food.custom.score = score;
+        food.custom.type = "food";
+
+        food.anchor.setTo(0.5, 0.5);
+        food.width = meters2Pixels(1);
+        food.height = meters2Pixels(1);
+        food.alpha = 0;
+        food.visible = true;
+
+        game.add.tween(food).to({alpha: 1}, 500, Phaser.Easing.None, true);
+    }
 
     function updateCookies(game, serverCookies) {
 
-        // OrderedIDs contains all ids in serverCookies ordered from low to high
-        var orderedIDs = function (cookies) {
-            ids = [];
-            cookies.forEach(function (el) {
-                ids.push(el.ID)
-            });
-            return ids.sort(function (a, b) {
-                return a - b;
-            });
-        }(serverCookies);
-
+        // sortedIDs contains all ids in serverCookies sorted ascending
+        var sortedIDs = IDsByOrder(serverCookies);
 
         // Positioning or removing known cookies
         game.world.forEach(function (cookie) {
             if (cookie.custom !== undefined && cookie.custom.type === "cookie") {
                 // Not in list. We should disable
-                if (orderedIDs.indexOf(cookie.custom.id) === -1 && cookie.custom.id !== game.myCookie.custom.id) {
+                if (sortedIDs.indexOf(cookie.custom.id) === -1 && cookie.custom.id !== game.myCookie.custom.id) {
                     cookie.visible = false;
                     //cookie.body.destroy();
                     console.log("removing cookie " + cookie.custom.id);
@@ -266,7 +269,7 @@
                             cookie.custom.label.x = meters2Pixels(info.X);
                             cookie.custom.label.y = meters2Pixels(info.Y) + cookie.body.height/2 + 50;
 
-                            orderedIDs.splice(orderedIDs.indexOf(info.ID), 1);
+                            sortedIDs.splice(sortedIDs.indexOf(info.ID), 1);
 
                         }
                     });
@@ -274,69 +277,43 @@
             }
         }, this, true);
 
-        orderedIDs.forEach(function (id) {
+        sortedIDs.forEach(function (id) {
             serverCookies.forEach(function (info) {
                 if (info.ID === id) {
-                    cookie = createCookie(game, id, info.X, info.Y, info.SC, info.AV);
+                    var cookie = createCookie(game, id, info.X, info.Y, info.SC, info.AV);
                 }
             })
         });
+    }
 
+    function updateFood(game, serverFood) {
+        // sortedIDs contains all ids in serverCookies sorted ascending
+        var sortedIDs = IDsByOrder(serverFood);
 
-        /*
-
-        game.world.forEach(function)
-
-
-        cookies.forEach(function (antInfo, key, map) {
-
-
-
-            var ant = antInfo.ant;
-            if (ant === null) {
-                ant = game.add.sprite(antInfo.X, antInfo.Y, "firefox");
-                ant.alpha = 0;
-                ant.anchor.setTo(0.5, 0.5);
-                ant.width = meters2Pixels(1.3 * 2 * Math.sqrt(antInfo.Score));
-                ant.height = meters2Pixels(1.3 * 2 * Math.sqrt(antInfo.Score));
-                ant.maxAngular = 100000;
-                ant.angularDrag = 0;
-
-                var filter = game.add.filter('Gray');
-                filter.blur = 0.05 * antInfo.Score;
-
-
-                //ant.filters = [filter];
-
-
-                game.add.tween(ant).to({alpha: 1}, 500, Phaser.Easing.None, true);
-
-                game.physics.enable(ant, Phaser.Physics.ARCADE);
-                ant.body.allowRotation = true;
-
-                antInfo.ant = ant;
-                map.set(key, antInfo);
-            }
-            if (antInfo.visible) {
-                ant.body.moves = true;
-                if (ant.visible) {
-                    game.physics.arcade.moveToXY(ant, antInfo.X, antInfo.Y, 500, 1 * 1000 * gameProperties.updateClientPeriod);
-                } else {
-                    ant.x = antInfo.X;
-                    ant.y = antInfo.Y;
-                    ant.velocity = new Phaser.Point(0, 0);
-                    ant.visible = true;
+        game.world.forEach(function (food) {
+            if (food.custom !== undefined && food.custom.type === "food") {
+                // Not in list. We should remove
+                if (sortedIDs.indexOf(food.custom.id) === -1) {
+                    food.visible = false;
                 }
-
-                ant.body.angularVelocity = 10 * antInfo.AV;
-
-            } else {
-                ant.visible = false;
-                ant.body.destroy();
-                map.delete(key);
             }
-        })
-        */
+        }, this, true);
+
+        sortedIDs.forEach(function (id) {
+            serverFood.forEach(function (info) {
+                if (info.ID === id) {
+                    var food = createFood(game, id, info.X, info.Y, info.SC);
+                }
+            })
+        });
+    }
+
+    function IDsByOrder(l) {
+        var ids = [];
+        l.forEach(function (el) {
+            ids.push(el.ID)
+        });
+        return ids.sort(function (a, b) {return a - b;});
     }
 
     function createCamera(game) {
