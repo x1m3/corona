@@ -59,7 +59,7 @@ type CookieInfo struct {
 
 type FoodInfo struct {
 	ID    uint64  `json:"ID"`
-	Score int     `json:"SC"`
+	Score uint64  `json:"SC"`
 	X     float32 `json:"X"`
 	Y     float32 `json:"Y"`
 }

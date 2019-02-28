@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/x1m3/elixir/games/cookies/messages"
 	"sync/atomic"
 )
@@ -18,28 +17,20 @@ type Game struct {
 	worldMutex sync.RWMutex
 	gSessions  *gameSessions
 
-	world        box2d.B2World
-	fpsSimul     float64
-	fps          float64
-	widthX       float64
-	widthY       float64
-	nAnts        int
-	events       chan pubsub.Event
-	speed        int
-	turboSpeed   int
-	maxFoodCount uint64
-	foodCount    uint64
+	world           box2d.B2World
+	contactListener box2d.B2ContactListenerInterface
+	fpsSimul        float64
+	fps             float64
+	widthX          float64
+	widthY          float64
+	nAnts           int
+	events          chan pubsub.Event
+	speed           int
+	turboSpeed      int
+	maxFoodCount    uint64
+	foodCount       uint64
 }
 
-type Cookie struct {
-	ID    int
-	Score int
-}
-
-type Food struct {
-	ID    uint64
-	Score int
-}
 
 // New returns a new cookies game.
 func New(widthX, widthY float64, nAnts int) *Game {
@@ -47,6 +38,7 @@ func New(widthX, widthY float64, nAnts int) *Game {
 	return &Game{
 		gSessions:    newGameSessions(),
 		world:        box2d.MakeB2World(box2d.MakeB2Vec2(0, 0)),
+		contactListener: newContactListener(),
 		fpsSimul:     45,
 		fps:          10,
 		nAnts:        nAnts,
@@ -61,6 +53,8 @@ func New(widthX, widthY float64, nAnts int) *Game {
 
 func (g *Game) Init() {
 	g.createWorld()
+	g.initCookies(g.nAnts, g.widthX, g.widthY)
+	g.initCollissionListeners()
 	go g.runSimulation(time.Duration(time.Second/time.Duration(g.fpsSimul)), 8, 2)
 }
 
@@ -115,8 +109,8 @@ func (g *Game) ViewPortRequest(sessionID uint64) (*messages.ViewportResponse, er
 		response.Cookies = append(
 			response.Cookies,
 			&messages.CookieInfo{
-				ID:              ant.GetUserData().(*gameSession).ID,
-				Score:           ant.GetUserData().(*gameSession).getScore(),
+				ID:              ant.GetUserData().(*Cookie).ID,
+				Score:           ant.GetUserData().(*Cookie).Score,
 				X:               float32(pos.X),
 				Y:               float32(pos.Y),
 				AngularVelocity: float32(ant.GetAngularVelocity()),
@@ -178,8 +172,6 @@ func (g *Game) createWorld() {
 	createWorldBoundary(&g.world, g.widthX/2, g.widthY, g.widthX, 0.1, true)
 	createWorldBoundary(&g.world, 0, g.widthY/2, 0.1, g.widthY, true)
 	createWorldBoundary(&g.world, g.widthX, g.widthY/2, 0.1, g.widthY, true)
-
-	g.initCookies(g.nAnts, g.widthX, g.widthY)
 }
 
 func (g *Game) addCookieToWorld(x float64, y float64, session *gameSession) *box2d.B2Body {
@@ -217,12 +209,12 @@ func (g *Game) addCookieToWorld(x float64, y float64, session *gameSession) *box
 	antBody.CreateFixtureFromDef(&fd)
 
 	// Save link to session
-	antBody.SetUserData(session)
+	antBody.SetUserData(&Cookie{ID:session.ID, Score:session.getScore()})
 
 	return antBody
 }
 
-func (g *Game) addFoodToWorld(x, y float64, score int) {
+func (g *Game) addFoodToWorld(x, y float64, score uint64) {
 	def := box2d.MakeB2BodyDef()
 	def.Position.Set(x, y)
 	def.Type = box2d.B2BodyType.B2_staticBody
@@ -251,13 +243,16 @@ func (g *Game) initCookies(number int, maxX float64, maxY float64) {
 
 	for i := 0; i < number; i++ {
 		sessionID := g.NewSession()
-		_, err := g.UserJoin(sessionID, &messages.UserJoinRequest{Username: "manolo"})
-		spew.Dump(err)
+		_, _ = g.UserJoin(sessionID, &messages.UserJoinRequest{Username: "manolo"})
 		cookie := g.addCookieToWorld(maxX*rand.Float64(), maxY*rand.Float64(), g.gSessions.session(sessionID))
 		// TODO: Refactor.. use a function!!!!
 		g.gSessions.session(sessionID).setBox2DBody(cookie)
 		g.gSessions.session(sessionID).state = &playingState{}
 	}
+}
+
+func (g *Game) initCollissionListeners() {
+	g.world.SetContactListener(g.contactListener)
 }
 
 func (g *Game) runSimulation(timeStep time.Duration, velocityIterations int, positionIterations int) {
@@ -357,7 +352,7 @@ func (g *Game) viewPort(v *viewport) ([]*box2d.B2Body, []*box2d.B2Body) {
 		func(fixture *box2d.B2Fixture) bool {
 			info := fixture.M_body.GetUserData()
 			switch info.(type) {
-			case *gameSession:
+			case *Cookie:
 				cookies = append(cookies, fixture.M_body)
 			case *Food:
 				food = append(food, fixture.M_body)
