@@ -1,6 +1,7 @@
 package cookies
 
 import (
+	"fmt"
 	"github.com/x1m3/elixir/pubsub"
 	"github.com/ByteArena/box2d"
 	"math/rand"
@@ -55,7 +56,7 @@ func New(widthX, widthY float64, nAnts int) *Game {
 		events:       make(chan pubsub.Event, 10000),
 		speed:        40,
 		turboSpeed:   65,
-		maxFoodCount: 1000,
+		maxFoodCount: 5000,
 	}
 }
 
@@ -89,10 +90,6 @@ func (g *Game) CreateCookie(sessionID uint64, req *messages.CreateCookieRequest)
 	x := float64(300 + rand.Intn(int(g.widthX-300)))
 	y := float64(300 + rand.Intn(int(g.widthY-300)))
 
-	/*
-		x := g.widthX / 2
-		y := g.widthY / 2
-	*/
 	log.Printf("New cookie at position <%f, %f>\n", x, y)
 	session.setBox2DBody(g.addCookieToWorld(x, y, session))
 	return messages.NewCreateCookieResponse(sessionID, session.getScore(), float32(x), float32(y), 10), nil
@@ -267,10 +264,12 @@ func (g *Game) initCookies(number int, maxX float64, maxY float64) {
 func (g *Game) runSimulation(timeStep time.Duration, velocityIterations int, positionIterations int) {
 	timeStep64 := float64(timeStep) / float64(time.Second)
 
-	foodTimer := time.NewTimer(2 * time.Second)
+	foodTicker := time.NewTicker(2 * time.Second)
 	go func() {
-		<-foodTimer.C
-		g.adjustFood()
+		for {
+			<-foodTicker.C
+			g.adjustFood()
+		}
 	}()
 
 	/*
