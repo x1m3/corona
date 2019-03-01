@@ -110,11 +110,11 @@
             bg.autoScroll(-10, -5);
 
             game.transport.registerCallback(
-                    UserJoinResponseType,
-                    function (msg) {
-                        console.log(msg);
-                        game.state.start('main');
-                    }
+                UserJoinResponseType,
+                function (msg) {
+                    console.log(msg);
+                    game.state.start('main');
+                }
             );
 
             var input = game.add.inputField((this.game.width - login_width) / 2, (this.game.height - login_height) / 2, {
@@ -131,18 +131,18 @@
             input.startFocus();
 
             button = game.add.button(
-                    (this.game.width - login_width) / 2,
-                    70 + (this.game.height - login_height) / 2,
-                    'login-button',
-                    function () {
-                        if (input.value !== "") {
-                            game.transport.send(new UserJoinRequest(input.value));
-                        }
-                    },
-                    this,
-                    2,
-                    1,
-                    0
+                (this.game.width - login_width) / 2,
+                70 + (this.game.height - login_height) / 2,
+                'login-button',
+                function () {
+                    if (input.value !== "") {
+                        game.transport.send(new UserJoinRequest(input.value));
+                    }
+                },
+                this,
+                2,
+                1,
+                0
             );
 
         }
@@ -167,21 +167,21 @@
             createCamera(game);
 
             game.transport.registerCallback(
-                    CreateCookieResponseType,
-                    function (msg) {
-                        cookie = createCookie(game, msg.d.ID, msg.d.X, msg.d.Y, msg.d.SC, msg.d.AV);
-                        game.myCookie = cookie;
-                        game.camera.follow(cookie, Phaser.Camera.FOLLOW_LOCKON, 1, 1);
+                CreateCookieResponseType,
+                function (msg) {
+                    cookie = createCookie(game, msg.d.ID, msg.d.X, msg.d.Y, msg.d.SC, msg.d.AV);
+                    game.myCookie = cookie;
+                    game.camera.follow(cookie, Phaser.Camera.FOLLOW_LOCKON, 1, 1);
 
-                    }
+                }
             );
 
             game.transport.registerCallback(
-                    ViewPortResponseType,
-                    function (msg) {
-                        updateCookies(game, msg.C);
-                        updateFood(game, msg.F);
-                    }
+                ViewPortResponseType,
+                function (msg) {
+                    updateCookies(game, msg.C);
+                    updateFood(game, msg.F);
+                }
             );
 
             game.transport.send(new CreateCookieRequest());
@@ -190,6 +190,9 @@
             if (game.myCookie !== null) {
                 updateCamera(game);
             }
+        },
+        render: function () {
+            //console.log('FPS: ' + game.time.fps || 'FPS: --', 40, 40, "#00ff00");
         },
     };
 
@@ -207,7 +210,14 @@
         cookie.angularDrag = 0;
 
         // Text
-        var style = { font: "24px Arial", fill: "#ffffaa", wordWrap: true, wordWrapWidth: cookie.width, align: "center", backgroundColor: "#111111" };
+        var style = {
+            font: "24px Arial",
+            fill: "#ffffaa",
+            wordWrap: true,
+            wordWrapWidth: cookie.width,
+            align: "center",
+            backgroundColor: "#111111"
+        };
         cookie.custom.label = game.add.text(meters2Pixels(x), meters2Pixels(y), cookie.custom.id + '\n(' + Math.floor(cookie.x) + ', ' + Math.floor(cookie.y) + ')', style);
         cookie.custom.label.anchor.set(0.5);
         cookie.custom.label.alpha = 0.7;
@@ -253,8 +263,6 @@
                 // Not in list. We should disable
                 if (sortedIDs.indexOf(cookie.custom.id) === -1 && cookie.custom.id !== game.myCookie.custom.id) {
                     cookie.visible = false;
-                    //cookie.body.destroy();
-                    console.log("removing cookie " + cookie.custom.id);
                     cookie.custom.label.destroy();
                     cookie.destroy();
 
@@ -267,7 +275,7 @@
 
 
                             cookie.custom.label.x = meters2Pixels(info.X);
-                            cookie.custom.label.y = meters2Pixels(info.Y) + cookie.body.height/2 + 50;
+                            cookie.custom.label.y = meters2Pixels(info.Y) + cookie.body.height / 2 + 50;
 
                             sortedIDs.splice(sortedIDs.indexOf(info.ID), 1);
 
@@ -295,6 +303,10 @@
                 // Not in list. We should remove
                 if (sortedIDs.indexOf(food.custom.id) === -1) {
                     food.visible = false;
+                    food.destroy();
+                } else {
+                    sortedIDs.splice(sortedIDs.indexOf(food.custom.id), 1);
+
                 }
             }
         }, this, true);
@@ -313,7 +325,9 @@
         l.forEach(function (el) {
             ids.push(el.ID)
         });
-        return ids.sort(function (a, b) {return a - b;});
+        return ids.sort(function (a, b) {
+            return a - b;
+        });
     }
 
     function createCamera(game) {
@@ -329,15 +343,15 @@
 
         var cam = game.camera;
         var cookie = game.myCookie;
-        var angle =  Math.atan2((game.input.worldY / game.world.scale.y - cookie.y), (game.input.worldX / game.world.scale.x - cookie.x));
+        var angle = Math.atan2((game.input.worldY / game.world.scale.y - cookie.y), (game.input.worldX / game.world.scale.x - cookie.x));
 
         var msg = new ViewPortRequest(
-                0.95 * pixels2Meters(cam.x / game.world.scale.x),
-                0.95 * pixels2Meters(cam.y / game.world.scale.y),
-                1.05 * pixels2Meters((cam.x + cam.width) / game.world.scale.x),
-                1.05 * pixels2Meters((cam.y + cam.height) / game.world.scale.y),
-                angle,
-                this.game.input.activePointer.isDown
+            0.95 * pixels2Meters(cam.x / game.world.scale.x),
+            0.95 * pixels2Meters(cam.y / game.world.scale.y),
+            1.05 * pixels2Meters((cam.x + cam.width) / game.world.scale.x),
+            1.05 * pixels2Meters((cam.y + cam.height) / game.world.scale.y),
+            angle,
+            this.game.input.activePointer.isDown
         );
 
 
