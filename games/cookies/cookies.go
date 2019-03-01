@@ -31,13 +31,14 @@ type Game struct {
 	turboSpeed      int
 	maxFoodCount    uint64
 	foodCount       uint64
+	bodys2Destroy   sync.Map // TODO: Refactor with something more performance. or not...
 }
 
 // New returns a new cookies game.
 func New(widthX, widthY float64, nAnts int) *Game {
 
-	chColl2Cookies := make(chan *collision2CookiesDTO,100)
-	chCollCookieFood := make(chan *collissionCookieFoodDTO,100)
+	chColl2Cookies := make(chan *collision2CookiesDTO, 1024)
+	chCollCookieFood := make(chan *collissionCookieFoodDTO, 1024)
 
 	return &Game{
 		gSessions:       newGameSessions(),
@@ -203,27 +204,28 @@ func (g *Game) addCookieToWorld(x float64, y float64, session *gameSession) *box
 	// fixture
 	fd := box2d.MakeB2FixtureDef()
 	fd.Shape = &shape
-	fd.Density = 10 * math.Sqrt(float64(score))
+	fd.Density = 100 * math.Sqrt(float64(score))
 	fd.Restitution = 0.7
 	fd.Friction = 0.1
 
 	// Create body
 	g.worldMutex.Lock()
-	antBody := g.world.CreateBody(&def)
+	body := g.world.CreateBody(&def)
 	g.worldMutex.Unlock()
 
-	antBody.CreateFixtureFromDef(&fd)
+	body.CreateFixtureFromDef(&fd)
 
 	// Save link to session
-	antBody.SetUserData(&Cookie{ID: session.ID, Score: session.getScore(), body: antBody})
+	body.SetUserData(&Cookie{ID: session.ID, Score: session.getScore(), body: body})
 
-	return antBody
+	return body
 }
 
 func (g *Game) addFoodToWorld(x, y float64, score uint64) {
 	def := box2d.MakeB2BodyDef()
 	def.Position.Set(x, y)
-	def.Type = box2d.B2BodyType.B2_staticBody
+	def.Type = box2d.B2BodyType.B2_dynamicBody
+	def.LinearDamping = 0
 	def.FixedRotation = true
 	def.AllowSleep = true
 
@@ -234,10 +236,14 @@ func (g *Game) addFoodToWorld(x, y float64, score uint64) {
 	// fixture
 	fd := box2d.MakeB2FixtureDef()
 	fd.Shape = &shape
+	fd.Density = 0.000001
+	fd.Restitution = 0
+	fd.Friction = 0
 
 	// Create body
 	g.worldMutex.Lock()
 	body := g.world.CreateBody(&def)
+
 	g.worldMutex.Unlock()
 	body.CreateFixtureFromDef(&fd)
 
@@ -280,6 +286,8 @@ func (g *Game) runSimulation(timeStep time.Duration, velocityIterations int, pos
 		g.worldMutex.Lock()
 
 		g.world.Step(timeStep64, velocityIterations, positionIterations)
+		g.removeBodies()
+
 		g.adjustSpeeds()
 
 		g.worldMutex.Unlock()
@@ -291,6 +299,14 @@ func (g *Game) runSimulation(timeStep time.Duration, velocityIterations int, pos
 			log.Printf("WARNING: Cannot sustain frame rate. Expected time <%v>. Real time <%v>", timeStep, elapsed)
 		}
 	}
+}
+
+func (g *Game) removeBodies() {
+	g.bodys2Destroy.Range(func(id interface{}, body interface{}) bool {
+		g.world.DestroyBody(body.(*box2d.B2Body))
+		g.bodys2Destroy.Delete(id)
+		return true
+	})
 }
 
 func (g *Game) adjustSpeeds() {
@@ -372,10 +388,9 @@ func (g *Game) viewPort(v *viewport) ([]*box2d.B2Body, []*box2d.B2Body) {
 	return cookies, food
 }
 
-
 func (g *Game) contactBetweenCookies() {
 	for {
-		collision := <- g.col2Cookies
+		collision := <-g.col2Cookies
 
 		cookie1 := collision.cookie1
 		cookie2 := collision.cookie2
@@ -385,20 +400,20 @@ func (g *Game) contactBetweenCookies() {
 
 func (g *Game) contactBetweenCookiesAndFood() {
 	for {
-		collision := <- g.colCookieFood
+		collision := <-g.colCookieFood
 
 		cookie := collision.cookie
 		food := collision.food
-		log.Printf("Collission between cookie<%d> and food <%d>", cookie.ID, food.ID)
 
+		g.gSessions.session(cookie.ID).score += food.Score
 
-		// TODO: WRONG. World is blocked when writing in the channel. It works because the channel is
-		// buffered and we can write. But if the buffer becomes full, writing will be blocked and
-		// world also, so we will never get the lock here and we hace a mutual exclusion condition.
-		g.worldMutex.Lock()
-		g.world.DestroyBody(food.body)
-		g.worldMutex.Unlock()
 		atomic.AddUint64(&g.foodCount, ^uint64(0)) // Decrement 1 :-)
 
+		// TODO: Remove food
+		g.bodys2Destroy.Store(food.ID, food.body)
 	}
+}
+
+func (g *Game) markBodyToBeDestroyed(body *box2d.B2Body) {
+
 }
