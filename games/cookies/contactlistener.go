@@ -2,10 +2,16 @@ package cookies
 
 import (
 	"github.com/ByteArena/box2d"
-	"log"
 )
 
+
 type contactListener struct {
+	chColl2Cookies chan *collision2CookiesDTO
+	chCollCookieFood chan *collissionCookieFoodDTO
+}
+
+func newContactListener(chCkCk chan *collision2CookiesDTO, chCkFd chan *collissionCookieFoodDTO) *contactListener {
+	return &contactListener{chColl2Cookies:chCkCk, chCollCookieFood:chCkFd}
 }
 
 func (l *contactListener) BeginContact(contact box2d.B2ContactInterface) {
@@ -53,13 +59,9 @@ func (l *contactListener) PostSolve(contact box2d.B2ContactInterface, impulse *b
 }
 
 func (l *contactListener) contactBetweenCookies(cookie1 *Cookie, cookie2 *Cookie) {
-	log.Printf("Collission between cookies <%d> and <%d>", cookie1.ID, cookie2.ID)
+	l.chColl2Cookies <- &collision2CookiesDTO{cookie1:cookie1, cookie2:cookie2}
 }
 
 func (l *contactListener) contactBetweenCookiesAndFood(cookie *Cookie, food *Food) {
-	log.Printf("Collission between cookie<%d> and food <%d>", cookie.ID, food.ID)
-}
-
-func newContactListener() *contactListener {
-	return &contactListener{}
+	l.chCollCookieFood <- &collissionCookieFoodDTO{cookie:cookie, food:food}
 }

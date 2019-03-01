@@ -25,29 +25,35 @@ type Game struct {
 	widthY          float64
 	nAnts           int
 	events          chan pubsub.Event
+	col2Cookies     chan *collision2CookiesDTO
+	colCookieFood   chan *collissionCookieFoodDTO
 	speed           int
 	turboSpeed      int
 	maxFoodCount    uint64
 	foodCount       uint64
 }
 
-
 // New returns a new cookies game.
 func New(widthX, widthY float64, nAnts int) *Game {
 
+	chColl2Cookies := make(chan *collision2CookiesDTO,100)
+	chCollCookieFood := make(chan *collissionCookieFoodDTO,100)
+
 	return &Game{
-		gSessions:    newGameSessions(),
-		world:        box2d.MakeB2World(box2d.MakeB2Vec2(0, 0)),
-		contactListener: newContactListener(),
-		fpsSimul:     45,
-		fps:          10,
-		nAnts:        nAnts,
-		widthX:       widthX,
-		widthY:       widthY,
-		events:       make(chan pubsub.Event, 10000),
-		speed:        40,
-		turboSpeed:   65,
-		maxFoodCount: 5000,
+		gSessions:       newGameSessions(),
+		world:           box2d.MakeB2World(box2d.MakeB2Vec2(0, 0)),
+		contactListener: newContactListener(chColl2Cookies, chCollCookieFood),
+		fpsSimul:        45,
+		fps:             10,
+		nAnts:           nAnts,
+		widthX:          widthX,
+		widthY:          widthY,
+		events:          make(chan pubsub.Event, 10000),
+		col2Cookies:     chColl2Cookies,
+		colCookieFood:   chCollCookieFood,
+		speed:           40,
+		turboSpeed:      65,
+		maxFoodCount:    5000,
 	}
 }
 
@@ -209,7 +215,7 @@ func (g *Game) addCookieToWorld(x float64, y float64, session *gameSession) *box
 	antBody.CreateFixtureFromDef(&fd)
 
 	// Save link to session
-	antBody.SetUserData(&Cookie{ID:session.ID, Score:session.getScore()})
+	antBody.SetUserData(&Cookie{ID: session.ID, Score: session.getScore(), body: antBody})
 
 	return antBody
 }
@@ -231,12 +237,12 @@ func (g *Game) addFoodToWorld(x, y float64, score uint64) {
 
 	// Create body
 	g.worldMutex.Lock()
-	antBody := g.world.CreateBody(&def)
+	body := g.world.CreateBody(&def)
 	g.worldMutex.Unlock()
-	antBody.CreateFixtureFromDef(&fd)
+	body.CreateFixtureFromDef(&fd)
 
 	// Save link to session
-	antBody.SetUserData(&Food{ID: rand.Uint64() << 8, Score: score})
+	body.SetUserData(&Food{ID: rand.Uint64() << 8, Score: score, body: body})
 }
 
 func (g *Game) initCookies(number int, maxX float64, maxY float64) {
@@ -266,11 +272,9 @@ func (g *Game) runSimulation(timeStep time.Duration, velocityIterations int, pos
 		}
 	}()
 
-	/*
-	allMap := box2d.MakeB2AABB()
-	allMap.LowerBound = box2d.MakeB2Vec2(0, 0)
-	allMap.UpperBound = box2d.MakeB2Vec2(g.widthX, g.widthY)
-	*/
+	go g.contactBetweenCookies()
+	go g.contactBetweenCookiesAndFood()
+
 	for {
 		t1 := time.Now()
 		g.worldMutex.Lock()
@@ -366,4 +370,35 @@ func (g *Game) viewPort(v *viewport) ([]*box2d.B2Body, []*box2d.B2Body) {
 	g.worldMutex.RUnlock()
 
 	return cookies, food
+}
+
+
+func (g *Game) contactBetweenCookies() {
+	for {
+		collision := <- g.col2Cookies
+
+		cookie1 := collision.cookie1
+		cookie2 := collision.cookie2
+		log.Printf("Collission between cookies <%d> and <%d>", cookie1.ID, cookie2.ID)
+	}
+}
+
+func (g *Game) contactBetweenCookiesAndFood() {
+	for {
+		collision := <- g.colCookieFood
+
+		cookie := collision.cookie
+		food := collision.food
+		log.Printf("Collission between cookie<%d> and food <%d>", cookie.ID, food.ID)
+
+
+		// TODO: WRONG. World is blocked when writing in the channel. It works because the channel is
+		// buffered and we can write. But if the buffer becomes full, writing will be blocked and
+		// world also, so we will never get the lock here and we hace a mutual exclusion condition.
+		g.worldMutex.Lock()
+		g.world.DestroyBody(food.body)
+		g.worldMutex.Unlock()
+		atomic.AddUint64(&g.foodCount, ^uint64(0)) // Decrement 1 :-)
+
+	}
 }
