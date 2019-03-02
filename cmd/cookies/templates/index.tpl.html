@@ -218,7 +218,7 @@
             align: "center",
             backgroundColor: "#111111"
         };
-        cookie.custom.label = game.add.text(meters2Pixels(x), meters2Pixels(y), cookie.custom.id + '\n(' + Math.floor(cookie.x) + ', ' + Math.floor(cookie.y) + ')', style);
+        cookie.custom.label = game.add.text(meters2Pixels(x), meters2Pixels(y), cookie.custom.id + '\n[' + cookie.custom.score +  ']', style);
         cookie.custom.label.anchor.set(0.5);
         cookie.custom.label.alpha = 0.7;
 
@@ -273,7 +273,7 @@
                             game.physics.arcade.moveToXY(cookie, meters2Pixels(info.X), meters2Pixels(info.Y), 250, 1 * 1000 * gameProperties.updateClientPeriod);
                             cookie.body.angularVelocity = 100 * info.AV;
 
-
+                            cookie.custom.label.setText(cookie.custom.id + '\n[' + cookie.custom.score +  ']');
                             cookie.custom.label.x = meters2Pixels(info.X);
                             cookie.custom.label.y = meters2Pixels(info.Y) + cookie.body.height / 2 + 50;
 

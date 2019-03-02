@@ -183,7 +183,7 @@ func (g *Game) createWorld() {
 
 func (g *Game) addCookieToWorld(x float64, y float64, session *gameSession) *box2d.B2Body {
 
-	score := 100
+	var score uint64 = 100
 
 	// Body definition
 	def := box2d.MakeB2BodyDef()
@@ -197,23 +197,12 @@ func (g *Game) addCookieToWorld(x float64, y float64, session *gameSession) *box
 	def.Angle = rand.Float64() * 2 * math.Pi
 	def.AngularVelocity = 10
 
-	// Shape
-	shape := box2d.MakeB2PolygonShape()
-	shape.SetAsBox(math.Sqrt(float64(score)), math.Sqrt(float64(score)))
-
-	// fixture
-	fd := box2d.MakeB2FixtureDef()
-	fd.Shape = &shape
-	fd.Density = 100 * math.Sqrt(float64(score))
-	fd.Restitution = 0.7
-	fd.Friction = 0.1
-
 	// Create body
 	g.worldMutex.Lock()
 	body := g.world.CreateBody(&def)
 	g.worldMutex.Unlock()
 
-	body.CreateFixtureFromDef(&fd)
+	body.CreateFixtureFromDef(g.getCookieFixtureDefByScore(score))
 
 	// Save link to session
 	body.SetUserData(&Cookie{ID: session.ID, Score: session.getScore(), body: body})
@@ -288,7 +277,7 @@ func (g *Game) runSimulation(timeStep time.Duration, velocityIterations int, pos
 		g.world.Step(timeStep64, velocityIterations, positionIterations)
 		g.removeBodies()
 
-		g.adjustSpeeds()
+		g.adjustSpeedsAndSizes()
 
 		g.worldMutex.Unlock()
 
@@ -309,7 +298,7 @@ func (g *Game) removeBodies() {
 	})
 }
 
-func (g *Game) adjustSpeeds() {
+func (g *Game) adjustSpeedsAndSizes() {
 
 	g.gSessions.each(func(session *gameSession) bool {
 
@@ -344,8 +333,33 @@ func (g *Game) adjustSpeeds() {
 		vector.OperatorScalarMulInplace(magnitude)
 		body.ApplyForce(vector, body.GetPosition(), true)
 
+		// size and score
+		data := body.GetUserData().(*Cookie)
+		if session.getScore() != data.Score {
+			data.Score = session.score
+
+			body.DestroyFixture(body.GetFixtureList())
+			body.CreateFixtureFromDef(g.getCookieFixtureDefByScore(data.Score))
+		}
 		return true
 	})
+}
+
+func (g *Game) getCookieFixtureDefByScore(score uint64) *box2d.B2FixtureDef {
+	// Shape
+	shape := box2d.MakeB2PolygonShape()
+	sc := float64(score)
+	len := (math.Log2(sc) + math.Sqrt(sc)) / 2
+
+	shape.SetAsBox(len, len)
+
+	// fixture
+	fd := box2d.MakeB2FixtureDef()
+	fd.Shape = &shape
+	fd.Density = 100 * math.Sqrt(sc)
+	fd.Restitution = 0.7
+	fd.Friction = 0.1
+	return &fd
 }
 
 func (g *Game) adjustFood() {
