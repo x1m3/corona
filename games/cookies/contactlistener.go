@@ -16,6 +16,10 @@ func newContactListener(chCkCk chan *collision2CookiesDTO, chCkFd chan *collissi
 
 func (l *contactListener) BeginContact(contact box2d.B2ContactInterface) {
 
+	if !contact.IsTouching() {
+		return
+	}
+
 	body1 := contact.GetFixtureA().GetBody()
 	body2 := contact.GetFixtureB().GetBody()
 

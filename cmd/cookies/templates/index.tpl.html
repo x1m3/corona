@@ -32,7 +32,7 @@
         pixels2Meters:{{.PixelsToMeters}}
     };
 
-    var zoomFactor = 0.8;
+    var zoomFactor = 1;
 
     $(document).ready(function () {
         game = new Phaser.Game(canvas_width, canvas_height, Phaser.AUTO, 'gameArea');
@@ -189,6 +189,8 @@
         update: function () {
             if (game.myCookie !== null) {
                 updateCamera(game);
+                // Launch in a timer.. we do not need to update constantly
+                updateZoom(game);
             }
         },
         render: function () {
@@ -219,7 +221,7 @@
             align: "center",
             backgroundColor: "#111111"
         };
-        cookie.custom.label = game.add.text(meters2Pixels(x), meters2Pixels(y), cookie.custom.id + '\n[' + cookie.custom.score +  ']', style);
+        cookie.custom.label = game.add.text(meters2Pixels(x), meters2Pixels(y), cookie.custom.id + '\n[' + cookie.custom.score + ']', style);
         cookie.custom.label.anchor.set(0.5);
         cookie.custom.label.alpha = 0.7;
 
@@ -283,7 +285,7 @@
                             }
 
 
-                            cookie.custom.label.setText(cookie.custom.id + '\n[' + info.SC +  ']');
+                            cookie.custom.label.setText(cookie.custom.id + '\n[' + info.SC + ']');
                             cookie.custom.label.x = meters2Pixels(info.X);
                             cookie.custom.label.y = meters2Pixels(info.Y) + cookie.body.height / 2 + 50;
 
@@ -340,6 +342,7 @@
         });
     }
 
+
     function createCamera(game) {
 
         var cameraFocusX = 100;
@@ -347,6 +350,14 @@
 
         game.world.scale.setTo(this.zoomFactor);
         game.camera.focusOnXY(cameraFocusX * game.world.scale.x, cameraFocusY * game.world.scale.y);
+    }
+
+    function updateZoom(game) {
+        if (game.myCookie.custom !== undefined) {
+            var score = game.myCookie.custom.score;
+            this.zoomFactor = 2 * 100 / meters2Pixels(Math.sqrt(score) + Math.log2(score));
+            game.world.scale.setTo(this.zoomFactor);
+        }
     }
 
     function updateCamera(game) {
@@ -363,7 +374,6 @@
             angle,
             this.game.input.activePointer.isDown
         );
-
 
         game.transport.send(msg);
     }
