@@ -52,8 +52,8 @@ func New(widthX, widthY float64, nAnts int) *Game {
 		events:          make(chan pubsub.Event, 10000),
 		col2Cookies:     chColl2Cookies,
 		colCookieFood:   chCollCookieFood,
-		speed:           40,
-		turboSpeed:      65,
+		speed:           45,
+		turboSpeed:      70,
 		maxFoodCount:    5000,
 	}
 }
@@ -346,12 +346,11 @@ func (g *Game) adjustSpeedsAndSizes() {
 }
 
 func (g *Game) getCookieFixtureDefByScore(score uint64) *box2d.B2FixtureDef {
-	// Shape
-	shape := box2d.MakeB2PolygonShape()
-	sc := float64(score)
-	len := (math.Log2(sc) + math.Sqrt(sc)) / 2
 
-	shape.SetAsBox(len, len)
+	// Shape
+	shape := box2d.MakeB2CircleShape()
+	sc := float64(score)
+	shape.M_radius = (math.Log2(sc) + math.Sqrt(sc)) / 2
 
 	// fixture
 	fd := box2d.MakeB2FixtureDef()
