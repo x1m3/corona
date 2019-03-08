@@ -43,6 +43,12 @@ type ViewPortRequest struct {
 	Turbo bool    `json:"T"`
 }
 
+func NewViewPortRequest(X, Y, XX, YY, Angle float32, turbo bool) *ViewPortRequest {
+	resp := &ViewPortRequest{X: X, Y: Y, XX: XX, YY: YY, Angle: Angle, Turbo: turbo}
+	resp.SetType(ViewPortRequestType)
+	return resp
+}
+
 type ViewportResponse struct {
 	BaseMessage
 	Cookies []*CookieInfo `json:"C"`
@@ -62,6 +68,16 @@ type FoodInfo struct {
 	Score uint64  `json:"SC"`
 	X     float32 `json:"X"`
 	Y     float32 `json:"Y"`
+}
+
+type CreateCookieRequest struct {
+	BaseMessage
+}
+
+func NewCreateCookieRequest() *CreateCookieRequest {
+	resp := &CreateCookieRequest{}
+	resp.SetType(CreateCookieRequestType)
+	return resp
 }
 
 type CreateCookieResponse struct {
@@ -88,6 +104,12 @@ type UserJoinRequest struct {
 	Username string `json:"UN"`
 }
 
+func NewUserJoinRequest(name string) *UserJoinRequest {
+	resp := &UserJoinRequest{Username: name}
+	resp.SetType(UserJoinRequestType)
+	return resp
+}
+
 type userJoinResponseData struct {
 	Ok       bool     `json:"OK"`
 	AltNames []string `json:"AN"`
@@ -102,8 +124,4 @@ func NewUserJoinResponse(ok bool, altNames []string) *UserJoinResponse {
 	resp := &UserJoinResponse{Data: userJoinResponseData{Ok: ok, AltNames: altNames}}
 	resp.SetType(UserJoinResponseType)
 	return resp
-}
-
-type CreateCookieRequest struct {
-	BaseMessage
 }

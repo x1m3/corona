@@ -12,9 +12,8 @@ type gameSession struct {
 	ID       uint64
 	userName string
 	score    uint64 // TODO: score should be an atomic counter
-	logged   bool
 	state    state
-	viewport *viewport
+	viewport viewport
 	box2dbody *box2d.B2Body
 }
 
@@ -38,43 +37,55 @@ func (s *gameSession) getViewport() (*viewport, error) {
 	s.RLock()
 	defer s.RUnlock()
 
-	if !s.state.canSendScreenUpdates() || s.viewport == nil {
+	if !s.state.canSendScreenUpdates() {
 		return nil, errCannotSendScreenUpdates
 	}
 
-	return s.viewport, nil
+	return &s.viewport, nil
 }
 
 func (s *gameSession) updateViewPort(x float32, y float32, xx float32, yy float32, a float32, t bool) {
 	s.Lock()
 	if s.state.canSendScreenUpdates() {
-		s.viewport = &viewport{x: x, y: y, xx: xx, yy: yy, angle: a, turbo: t}
+		s.viewport.x = x
+		s.viewport.y = y
+		s.viewport.xx = xx
+		s.viewport.yy = yy
+		s.viewport.angle = a
+		s.viewport.turbo = t
 	}
 	s.Unlock()
 }
 
 func (s *gameSession) login(username string) error {
-	s.Lock()
-	defer s.Unlock()
 
-	if s.logged {
+	if s.inLoggedState() {
 		return errUserWasLogged
 	}
+	s.Lock()
 	s.state = &loggedState{}
 	s.userName = username
-	s.logged = true
+	s.Unlock()
 
 	return nil
 }
 
+func (s *gameSession) inLoggedState() bool {
+	s.RLock()
+	_,  logged := s.state.(*loggedState)
+	s.RUnlock()
+	return logged
+}
+
 func (s *gameSession) startPlaying() error {
-	s.Lock()
-	defer s.Unlock()
 
 	if _, ok := s.state.(*loggedState); !ok {
 		return errors.New("not logged user wants to play")
 	}
+
+	s.Lock()
 	s.state = &playingState{}
+	s.Unlock()
 
 	return nil
 }

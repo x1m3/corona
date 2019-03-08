@@ -1,6 +1,7 @@
 package cookies
 
 import (
+	"errors"
 	"github.com/ByteArena/box2d"
 	"github.com/x1m3/elixir/pubsub"
 	"log"
@@ -83,15 +84,17 @@ func (g *Game) CreateCookie(sessionID uint64, req *messages.CreateCookieRequest)
 
 	session := g.gSessions.session(sessionID)
 
-	if err := session.startPlaying(); err != nil {
-		return nil, err
+	if !session.inLoggedState() {
+		return nil, errors.New("not logged user wants to play")
 	}
 
 	x := float64(300 + rand.Intn(int(g.widthX-300)))
 	y := float64(300 + rand.Intn(int(g.widthY-300)))
-
-	log.Printf("New cookie at position <%f, %f>\n", x, y)
 	session.setBox2DBody(g.addCookieToWorld(x, y, session))
+
+	if err := session.startPlaying(); err != nil {
+		return nil, err
+	}
 	return messages.NewCreateCookieResponse(sessionID, session.getScore(), float32(x), float32(y), 10), nil
 }
 
@@ -313,9 +316,7 @@ func (g *Game) adjustSpeedsAndSizes() {
 		expectedSpeed := float64(session.getScore() / 10)
 		body.ApplyTorque(inertia*(expectedSpeed-currentSpeed)/2, true)
 
-		if session.viewport == nil {
-			return true
-		}
+
 
 		// Linear speed, based on configuration, but also on spinning angular speed.
 		speedX := body.GetLinearVelocity().X
