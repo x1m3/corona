@@ -128,10 +128,6 @@ func (s *gameSessions) session(id uint64) *gameSession {
 	return s.sessions[id]
 }
 
-func (s *gameSessions) StartPlaying(ID uint64) error {
-	return s.session(ID).startPlaying()
-}
-
 func (s *gameSessions) each(fn func(s *gameSession) bool) {
 	s.Lock()
 	defer s.Unlock()
