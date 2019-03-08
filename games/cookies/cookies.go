@@ -61,7 +61,6 @@ func New(widthX, widthY float64, nAnts int) *Game {
 
 func (g *Game) Init() {
 	g.createWorld()
-	g.initCookies(g.nAnts, g.widthX, g.widthY)
 	g.initCollissionListeners()
 	go g.runSimulation(time.Duration(time.Second/time.Duration(g.fpsSimul)), 8, 2)
 }
@@ -90,6 +89,7 @@ func (g *Game) CreateCookie(sessionID uint64, req *messages.CreateCookieRequest)
 
 	x := float64(300 + rand.Intn(int(g.widthX-300)))
 	y := float64(300 + rand.Intn(int(g.widthY-300)))
+	//TODO: Bloquear mundo a ver si peta al crear muchos!!!!!
 	session.setBox2DBody(g.addCookieToWorld(x, y, session))
 
 	if err := session.startPlaying(); err != nil {
@@ -241,18 +241,6 @@ func (g *Game) addFoodToWorld(x, y float64, score uint64) {
 
 	// Save link to session
 	body.SetUserData(&Food{ID: rand.Uint64() << 8, Score: score, body: body})
-}
-
-func (g *Game) initCookies(number int, maxX float64, maxY float64) {
-
-	for i := 0; i < number; i++ {
-		sessionID := g.NewSession()
-		_, _ = g.UserJoin(sessionID, &messages.UserJoinRequest{Username: "manolo"})
-		cookie := g.addCookieToWorld(maxX*rand.Float64(), maxY*rand.Float64(), g.gSessions.session(sessionID))
-		// TODO: Refactor.. use a function!!!!
-		g.gSessions.session(sessionID).setBox2DBody(cookie)
-		g.gSessions.session(sessionID).state = &playingState{}
-	}
 }
 
 func (g *Game) initCollissionListeners() {

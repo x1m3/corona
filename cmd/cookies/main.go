@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/x1m3/elixir/games/cookies/bots"
+
 	"net/http"
 	"time"
 	"github.com/gorilla/mux"
@@ -56,6 +58,19 @@ func main() {
 
 	go game.Init()
 	log.Println("Starting Server")
+
+	for i := 0; i < 10; i++ {
+		bot := bots.New(game, bots.NewDummyBotAgent(100, 100))
+		go func() {
+			log.Println("Bot started", i)
+			if err := bot.Run(); err != nil {
+				log.Println(err)
+				bot.Destroy()
+				return
+			}
+
+		}()
+	}
 
 	server.ListenAndServe()
 }
@@ -151,7 +166,7 @@ func handleWSRequests(transport *cookies.Transport, sessionID uint64) {
 			resp, errResp = game.UserJoin(sessionID, msg.(*messages.UserJoinRequest))
 
 		case messages.CreateCookieRequestType:
-			resp,errResp = game.CreateCookie(sessionID, msg.(*messages.CreateCookieRequest))
+			resp, errResp = game.CreateCookie(sessionID, msg.(*messages.CreateCookieRequest))
 
 		default:
 			log.Printf("got unknown message type <%v>", msg)
