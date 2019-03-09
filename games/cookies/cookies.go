@@ -258,8 +258,8 @@ func (g *Game) runSimulation(timeStep time.Duration, velocityIterations int, pos
 		}
 	}()
 
-	go g.contactBetweenCookies()
-	go g.contactBetweenCookiesAndFood()
+	go g.listenContactBetweenCookies()
+	go g.listenContactBetweenCookiesAndFood()
 
 	for {
 		t1 := time.Now()
@@ -389,18 +389,37 @@ func (g *Game) viewPort(v *viewport) ([]*box2d.B2Body, []*box2d.B2Body) {
 	return cookies, food
 }
 
-func (g *Game) contactBetweenCookies() {
+func (g *Game) listenContactBetweenCookies() {
 	for {
 		collision := <-g.col2Cookies
 
-		cookie1 := collision.cookie1
-		cookie2 := collision.cookie2
-		_ = cookie1
-		_ = cookie2
+		cookie1, cookie2 := collision.cookie1, collision.cookie2
+
+		score1, score2 := float64(cookie1.Score), float64(cookie2.Score)
+
+		diff := math.Abs(score1-score2)
+
+		newScore1 := score1 - 0.1 * score1 - diff
+		newScore2 := score2 - 0.1 * score2 - diff
+
+		if newScore1<50 {
+			g.bodys2Destroy.Store(cookie1.ID, cookie1.body)
+			// TODO: Notify explotion
+			continue
+		}
+		if newScore2<50 {
+			g.bodys2Destroy.Store(cookie2.ID, cookie2.body)
+			// TODO: Notify explotion
+			continue
+		}
+
+		// TODO: Adjust size, probably with a new list
+
+		// TODO: Throw some food
 	}
 }
 
-func (g *Game) contactBetweenCookiesAndFood() {
+func (g *Game) listenContactBetweenCookiesAndFood() {
 	for {
 		collision := <-g.colCookieFood
 
