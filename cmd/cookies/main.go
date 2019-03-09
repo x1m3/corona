@@ -59,9 +59,9 @@ func main() {
 	go game.Init()
 	log.Println("Starting Server")
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 100; i++ {
 		bot := bots.New(game, bots.NewDummyBotAgent(100, 100))
-		go func() {
+		go func(i int) {
 			log.Println("Bot started", i)
 			if err := bot.Run(); err != nil {
 				log.Println(err)
@@ -69,7 +69,7 @@ func main() {
 				return
 			}
 
-		}()
+		}(i)
 	}
 
 	server.ListenAndServe()

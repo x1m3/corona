@@ -2,7 +2,6 @@ package bots
 
 import (
 	"github.com/x1m3/elixir/games/cookies/messages"
-	"log"
 	"math"
 	"math/rand"
 )
@@ -40,7 +39,6 @@ func (b *dummyBotAgent) Move() *messages.ViewPortRequest {
 
 		b.pendingTurnSteps = rand.Intn(100)
 		b.desiredAngle = float32(math.Mod(rand.Float64(), 2 * math.Pi)) * 2 * math.Pi
-		log.Printf("changing direction to <%f>", b.desiredAngle)
 	}
 	b.pendingTurnSteps--
 

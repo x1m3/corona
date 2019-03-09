@@ -89,7 +89,7 @@ func (g *Game) CreateCookie(sessionID uint64, req *messages.CreateCookieRequest)
 
 	x := float64(300 + rand.Intn(int(g.widthX-300)))
 	y := float64(300 + rand.Intn(int(g.widthY-300)))
-	//TODO: Bloquear mundo a ver si peta al crear muchos!!!!!
+
 	session.setBox2DBody(g.addCookieToWorld(x, y, session))
 
 	if err := session.startPlaying(); err != nil {
@@ -203,12 +203,12 @@ func (g *Game) addCookieToWorld(x float64, y float64, session *gameSession) *box
 	// Create body
 	g.worldMutex.Lock()
 	body := g.world.CreateBody(&def)
-	g.worldMutex.Unlock()
 
 	body.CreateFixtureFromDef(g.getCookieFixtureDefByScore(score))
 
 	// Save link to session
 	body.SetUserData(&Cookie{ID: session.ID, Score: session.getScore(), body: body})
+	g.worldMutex.Unlock()
 
 	return body
 }
@@ -396,7 +396,8 @@ func (g *Game) contactBetweenCookies() {
 
 		cookie1 := collision.cookie1
 		cookie2 := collision.cookie2
-		log.Printf("Collission between cookies <%d> and <%d>", cookie1.ID, cookie2.ID)
+		_ = cookie1
+		_ = cookie2
 	}
 }
 
