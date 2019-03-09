@@ -273,7 +273,7 @@
                     cookie.visible = true;
                     serverCookies.forEach(function (info) {
                         if (info.ID === cookie.custom.id) {
-                            game.physics.arcade.moveToXY(cookie, meters2Pixels(info.X), meters2Pixels(info.Y), 250, 1 * 1000 * gameProperties.updateClientPeriod);
+                            game.physics.arcade.moveToXY(cookie, meters2Pixels(info.X), meters2Pixels(info.Y), 0, 1.5 * 1000 * gameProperties.updateClientPeriod);
                             cookie.body.angularVelocity = 100 * info.AV;
 
                             if (cookie.custom.score !== info.SC) {

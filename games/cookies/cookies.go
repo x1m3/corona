@@ -55,7 +55,7 @@ func New(widthX, widthY float64, nAnts int) *Game {
 		colCookieFood:   chCollCookieFood,
 		speed:           45,
 		turboSpeed:      70,
-		maxFoodCount:    5000,
+		maxFoodCount:    100000,
 	}
 }
 
@@ -236,11 +236,11 @@ func (g *Game) addFoodToWorld(x, y float64, score uint64) {
 	g.worldMutex.Lock()
 	body := g.world.CreateBody(&def)
 
-	g.worldMutex.Unlock()
 	body.CreateFixtureFromDef(&fd)
 
 	// Save link to session
 	body.SetUserData(&Food{ID: rand.Uint64() << 8, Score: score, body: body})
+	g.worldMutex.Unlock()
 }
 
 func (g *Game) initCollissionListeners() {
@@ -382,7 +382,6 @@ func (g *Game) viewPort(v *viewport) ([]*box2d.B2Body, []*box2d.B2Body) {
 			return true
 		},
 		box2d.B2AABB{LowerBound: box2d.MakeB2Vec2(float64(v.x), float64(v.y)), UpperBound: box2d.MakeB2Vec2(float64(v.xx), float64(v.yy))},
-		//Return all box2d.B2AABB{LowerBound: box2d.MakeB2Vec2(0, 0), UpperBound: box2d.MakeB2Vec2(g.widthX, g.widthY)},
 	)
 
 	g.worldMutex.RUnlock()
@@ -412,11 +411,7 @@ func (g *Game) contactBetweenCookiesAndFood() {
 
 		atomic.AddUint64(&g.foodCount, ^uint64(0)) // Decrement 1 :-)
 
-		// TODO: Remove food
+		// adding body to the to be destroyed list.
 		g.bodys2Destroy.Store(food.ID, food.body)
 	}
-}
-
-func (g *Game) markBodyToBeDestroyed(body *box2d.B2Body) {
-
 }
