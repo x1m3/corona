@@ -253,6 +253,7 @@
         food.visible = true;
 
         game.add.tween(food).to({alpha: 1}, 500, Phaser.Easing.None, true);
+        game.physics.enable(food, Phaser.Physics.ARCADE);
     }
 
     function updateCookies(game, serverCookies) {
@@ -317,8 +318,12 @@
                     food.visible = false;
                     food.destroy();
                 } else {
+                    serverFood.forEach(function (info) {
+                        if (info.ID === food.custom.id) {
+                            game.physics.arcade.moveToXY(food, meters2Pixels(info.X), meters2Pixels(info.Y), 0, 1.5 * 1000 * gameProperties.updateClientPeriod);
+                        }
+                    });
                     sortedIDs.splice(sortedIDs.indexOf(food.custom.id), 1);
-
                 }
             }
         }, this, true);

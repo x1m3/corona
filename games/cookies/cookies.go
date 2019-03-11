@@ -3,6 +3,7 @@ package cookies
 import (
 	"errors"
 	"github.com/ByteArena/box2d"
+	"github.com/x1m3/elixir/pkg/list"
 	"github.com/x1m3/elixir/pubsub"
 	"log"
 	"math"
@@ -30,9 +31,10 @@ type Game struct {
 	colCookieFood   chan *collissionCookieFoodDTO
 	speed           int
 	turboSpeed      int
-	maxFoodCount    uint64
+	minFoodCount    uint64
 	foodCount       uint64
-	bodys2Destroy   sync.Map // TODO: Refactor with something more performance. or not...
+	bodies2Destroy  sync.Map // TODO: Refactor with something more performance. or not...
+	foodQueue       *list.LIFO
 }
 
 // New returns a new cookies game.
@@ -55,7 +57,8 @@ func New(widthX, widthY float64, nAnts int) *Game {
 		colCookieFood:   chCollCookieFood,
 		speed:           45,
 		turboSpeed:      70,
-		maxFoodCount:    100000,
+		minFoodCount:    5000,
+		foodQueue:       list.NewLIFO(),
 	}
 }
 
@@ -185,8 +188,10 @@ func (g *Game) createWorld() {
 }
 
 func (g *Game) addCookieToWorld(x float64, y float64, session *gameSession) *box2d.B2Body {
-
 	var score uint64 = 100
+
+	g.worldMutex.Lock()
+	defer g.worldMutex.Unlock()
 
 	// Body definition
 	def := box2d.MakeB2BodyDef()
@@ -201,24 +206,27 @@ func (g *Game) addCookieToWorld(x float64, y float64, session *gameSession) *box
 	def.AngularVelocity = 10
 
 	// Create body
-	g.worldMutex.Lock()
+
 	body := g.world.CreateBody(&def)
 
 	body.CreateFixtureFromDef(g.getCookieFixtureDefByScore(score))
 
 	// Save link to session
 	body.SetUserData(&Cookie{ID: session.ID, Score: session.getScore(), body: body})
-	g.worldMutex.Unlock()
 
 	return body
 }
 
-func (g *Game) addFoodToWorld(x, y float64, score uint64) {
+func (g *Game) addFoodToWorld(x, y float64, score uint64, dispersion int) {
+	if dispersion <= 0 {
+		dispersion = 1
+	}
+
 	def := box2d.MakeB2BodyDef()
 	def.Position.Set(x, y)
 	def.Type = box2d.B2BodyType.B2_dynamicBody
-	def.LinearDamping = 0
-	def.FixedRotation = true
+	def.LinearDamping = 1
+	def.FixedRotation = false
 	def.AllowSleep = true
 
 	// Shape
@@ -228,19 +236,19 @@ func (g *Game) addFoodToWorld(x, y float64, score uint64) {
 	// fixture
 	fd := box2d.MakeB2FixtureDef()
 	fd.Shape = &shape
-	fd.Density = 0.000001
+	fd.Density = 1
 	fd.Restitution = 0
-	fd.Friction = 0
+	fd.Friction = 1
 
 	// Create body
-	g.worldMutex.Lock()
 	body := g.world.CreateBody(&def)
 
 	body.CreateFixtureFromDef(&fd)
 
 	// Save link to session
 	body.SetUserData(&Food{ID: rand.Uint64() << 8, Score: score, body: body})
-	g.worldMutex.Unlock()
+
+	body.ApplyForce(box2d.MakeB2Vec2(float64(2*rand.Intn(dispersion)-dispersion), float64(2*rand.Intn(dispersion)-dispersion)), body.GetPosition(), true)
 }
 
 func (g *Game) initCollissionListeners() {
@@ -250,24 +258,37 @@ func (g *Game) initCollissionListeners() {
 func (g *Game) runSimulation(timeStep time.Duration, velocityIterations int, positionIterations int) {
 	timeStep64 := float64(timeStep) / float64(time.Second)
 
+	g.worldMutex.Lock()
+	for i := 0; i < int(g.minFoodCount); i++ {
+		g.addFoodToWorld(float64(300+rand.Intn(int(g.widthX-300))), float64(300+rand.Intn(int(g.widthX-300))), 5, 1000)
+		log.Printf("Food <%d>\n", i)
+	}
+	atomic.AddUint64(&g.foodCount, g.minFoodCount)
+	g.worldMutex.Unlock()
+
 	foodTicker := time.NewTicker(2 * time.Second)
 	go func() {
 		for {
 			<-foodTicker.C
+			g.worldMutex.Lock()
 			g.adjustFood()
+			g.worldMutex.Unlock()
 		}
 	}()
+
 
 	go g.listenContactBetweenCookies()
 	go g.listenContactBetweenCookiesAndFood()
 
+
 	for {
 		t1 := time.Now()
+
 		g.worldMutex.Lock()
 
 		g.world.Step(timeStep64, velocityIterations, positionIterations)
 		g.removeBodies()
-
+		g.runFoodTasks()
 		g.adjustSpeedsAndSizes()
 
 		g.worldMutex.Unlock()
@@ -281,10 +302,27 @@ func (g *Game) runSimulation(timeStep time.Duration, velocityIterations int, pos
 	}
 }
 
+func (g *Game) runFoodTasks() {
+
+	for  {
+		o := g.foodQueue.Pop()
+		if o == nil {
+			return
+		}
+		task := o.(*throwFoodTask)
+		for i:=0; i<task.count; i+=5 {
+			//g.addFoodToWorld(task.x, task.y, 5, rand.Intn(10000))
+			//g.addFoodToWorld(float64(300+rand.Intn(int(g.widthX-300))), float64(300+rand.Intn(int(g.widthX-300))), 5, 1000)
+		}
+	}
+
+
+}
+
 func (g *Game) removeBodies() {
-	g.bodys2Destroy.Range(func(id interface{}, body interface{}) bool {
+	g.bodies2Destroy.Range(func(id interface{}, body interface{}) bool {
 		g.world.DestroyBody(body.(*box2d.B2Body))
-		g.bodys2Destroy.Delete(id)
+		g.bodies2Destroy.Delete(id)
 		return true
 	})
 }
@@ -303,8 +341,6 @@ func (g *Game) adjustSpeedsAndSizes() {
 		currentSpeed := body.M_angularVelocity
 		expectedSpeed := float64(session.getScore() / 10)
 		body.ApplyTorque(inertia*(expectedSpeed-currentSpeed)/2, true)
-
-
 
 		// Linear speed, based on configuration, but also on spinning angular speed.
 		speedX := body.GetLinearVelocity().X
@@ -345,22 +381,24 @@ func (g *Game) getCookieFixtureDefByScore(score uint64) *box2d.B2FixtureDef {
 	fd := box2d.MakeB2FixtureDef()
 	fd.Shape = &shape
 	fd.Density = 100 * math.Sqrt(sc)
-	fd.Restitution = 0.7
+	fd.Restitution = 1
 	fd.Friction = 0.1
 	return &fd
 }
 
 func (g *Game) adjustFood() {
-	const N = 100
+	const N = 1000
 
 	foodCount := atomic.LoadUint64(&g.foodCount)
+	log.Println(foodCount)
 
-	if foodCount < g.maxFoodCount {
+	if foodCount < g.minFoodCount {
+		log.Println("ajustando", foodCount, g.minFoodCount)
 		for i := 0; i < N; i++ {
-			g.addFoodToWorld(float64(300+rand.Intn(int(g.widthX-300))), float64(300+rand.Intn(int(g.widthX-300))), 5)
+			g.addFoodToWorld(float64(300+rand.Intn(int(g.widthX-300))), float64(300+rand.Intn(int(g.widthX-300))), 5, 1000)
 		}
+		atomic.AddUint64(&g.foodCount, N)
 	}
-	atomic.AddUint64(&g.foodCount, N)
 }
 
 func (g *Game) viewPort(v *viewport) ([]*box2d.B2Body, []*box2d.B2Body) {
@@ -397,25 +435,27 @@ func (g *Game) listenContactBetweenCookies() {
 
 		score1, score2 := float64(cookie1.Score), float64(cookie2.Score)
 
-		diff := math.Abs(score1-score2)
+		diff := math.Abs(score1 - score2)
 
-		newScore1 := score1 - 0.1 * score1 - diff
-		newScore2 := score2 - 0.1 * score2 - diff
+		newScore1 := score1 - 0.1*score1 - diff
+		newScore2 := score2 - 0.1*score2 - diff
 
-		if newScore1<50 {
-			g.bodys2Destroy.Store(cookie1.ID, cookie1.body)
+		if newScore1 < 50 {
+			g.bodies2Destroy.Store(cookie1.ID, cookie1.body)
 			// TODO: Notify explotion
 			continue
 		}
-		if newScore2<50 {
-			g.bodys2Destroy.Store(cookie2.ID, cookie2.body)
+		if newScore2 < 50 {
+			g.bodies2Destroy.Store(cookie2.ID, cookie2.body)
 			// TODO: Notify explotion
 			continue
 		}
 
 		// TODO: Adjust size, probably with a new list
 
-		// TODO: Throw some food
+		// Throw some food
+		g.foodQueue.Push(newThrowFoodTask(int(score1-newScore1), cookie1.body.GetPosition().X, cookie1.body.GetPosition().Y))
+		g.foodQueue.Push(newThrowFoodTask(int(score2-newScore2), cookie2.body.GetPosition().X, cookie2.body.GetPosition().Y))
 	}
 }
 
@@ -431,6 +471,6 @@ func (g *Game) listenContactBetweenCookiesAndFood() {
 		atomic.AddUint64(&g.foodCount, ^uint64(0)) // Decrement 1 :-)
 
 		// adding body to the to be destroyed list.
-		g.bodys2Destroy.Store(food.ID, food.body)
+		g.bodies2Destroy.Store(food.ID, food.body)
 	}
 }
