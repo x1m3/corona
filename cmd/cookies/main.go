@@ -35,7 +35,7 @@ var game *cookies.Game
 
 func main() {
 
-	game = cookies.New(gameWidthMeters, gameHeightMeters, NumCookies)
+	game = cookies.New(gameWidthMeters, gameHeightMeters)
 
 	router := &mux.Router{}
 	router.NotFoundHandler = func() http.HandlerFunc {

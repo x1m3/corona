@@ -7,28 +7,28 @@ import (
 )
 
 type Game struct {
-	gSessions  *gameSessions
-	world2          *world
-	width           float64
-	height          float64
+	gSessions *gameSessions
+	world     *world
+	width     float64
+	height    float64
 }
 
 // New returns a new cookies game.
-func New(widthX, widthY float64, nAnts int) *Game {
+func New(widthX, widthY float64) *Game {
 
 	gameSessions := newGameSessions()
 
 	return &Game{
-		gSessions:       gameSessions,
-		world2:          NewWorld(gameSessions, widthX, widthY, 10, 60, 45, 70, 5000),
-		width:           widthX,
-		height:          widthY,
+		gSessions: gameSessions,
+		world:     NewWorld(gameSessions, widthX, widthY, 10, 60, 45, 70, 5000),
+		width:     widthX,
+		height:    widthY,
 	}
 }
 
 func (g *Game) Init() {
-	g.world2.createWorld()
-	go g.world2.runSimulation( 4, 1)
+	g.world.createWorld()
+	go g.world.runSimulation( 4, 1)
 }
 
 func (g *Game) NewSession() uint64 {
@@ -56,7 +56,7 @@ func (g *Game) CreateCookie(sessionID uint64, req *messages.CreateCookieRequest)
 	x := float64(300 + rand.Intn(int(g.width-300)))
 	y := float64(300 + rand.Intn(int(g.height-300)))
 
-	session.setBox2DBody(g.world2.addCookieToWorld(x, y, session))
+	session.setBox2DBody(g.world.addCookieToWorld(x, y, session))
 
 	if err := session.startPlaying(); err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func (g *Game) ViewPortRequest(sessionID uint64) (*messages.ViewportResponse, er
 		return nil, err
 	}
 
-	cookies, food := g.world2.viewPort(v)
+	cookies, food := g.world.viewPort(v)
 
 	response := messages.ViewportResponse{}
 	response.Type = messages.ViewPortResponseType
