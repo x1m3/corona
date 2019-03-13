@@ -15,6 +15,7 @@ import (
 
 	"github.com/x1m3/elixir/games/cookies/codec/json"
 	"github.com/x1m3/elixir/games/cookies/messages"
+	_ "net/http/pprof"
 )
 
 const (
@@ -59,7 +60,7 @@ func main() {
 	go game.Init()
 	log.Println("Starting Server")
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 1000; i++ {
 		bot := bots.New(game, bots.NewDummyBotAgent(100, 100))
 		go func(i int) {
 			log.Println("Bot started", i)
@@ -71,6 +72,10 @@ func main() {
 
 		}(i)
 	}
+
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 
 	server.ListenAndServe()
 }

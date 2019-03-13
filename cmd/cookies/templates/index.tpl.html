@@ -360,7 +360,7 @@
     function updateZoom(game) {
         if (game.myCookie.custom !== undefined) {
             var score = game.myCookie.custom.score;
-            this.zoomFactor = 2 * 100 / meters2Pixels(Math.sqrt(score) + Math.log2(score));
+            this.zoomFactor =  75 / meters2Pixels(Math.log2(score));
             game.world.scale.setTo(this.zoomFactor);
         }
     }

@@ -50,7 +50,7 @@ func (b *Bot) Run() error {
 
 	b.game.UpdateViewPortRequest(sessionID, b.agent.Move())
 
-	ticker := time.NewTicker(200 * time.Millisecond)
+	ticker := time.NewTicker(20 * time.Millisecond)
 	for {
 		select {
 		case <-ticker.C:

@@ -47,7 +47,7 @@ func New(widthX, widthY float64, nAnts int) *Game {
 		gSessions:       newGameSessions(),
 		world:           box2d.MakeB2World(box2d.MakeB2Vec2(0, 0)),
 		contactListener: newContactListener(chColl2Cookies, chCollCookieFood),
-		fpsSimul:        45,
+		fpsSimul:        24, // TODO: Make this value variable between 10 and 60 based on runtime FPS
 		fps:             10,
 		nAnts:           nAnts,
 		widthX:          widthX,
@@ -65,7 +65,7 @@ func New(widthX, widthY float64, nAnts int) *Game {
 func (g *Game) Init() {
 	g.createWorld()
 	g.initCollissionListeners()
-	go g.runSimulation(time.Duration(time.Second/time.Duration(g.fpsSimul)), 8, 2)
+	go g.runSimulation(time.Duration(time.Second/time.Duration(g.fpsSimul)), 4, 1)
 }
 
 func (g *Game) NewSession() uint64 {
@@ -116,17 +116,17 @@ func (g *Game) ViewPortRequest(sessionID uint64) (*messages.ViewportResponse, er
 	response.Cookies = make([]*messages.CookieInfo, 0, len(cookies))
 	response.Food = make([]*messages.FoodInfo, 0, len(food))
 
-	g.worldMutex.RLock()
-	for _, ant := range cookies {
-		pos := ant.GetPosition()
+	//g.worldMutex.RLock()
+	for _, cookie := range cookies {
+		pos := cookie.GetPosition()
 		response.Cookies = append(
 			response.Cookies,
 			&messages.CookieInfo{
-				ID:              ant.GetUserData().(*Cookie).ID,
-				Score:           ant.GetUserData().(*Cookie).Score,
+				ID:              cookie.GetUserData().(*Cookie).ID,
+				Score:           cookie.GetUserData().(*Cookie).Score,
 				X:               float32(pos.X),
 				Y:               float32(pos.Y),
-				AngularVelocity: float32(ant.GetAngularVelocity()),
+				AngularVelocity: float32(cookie.GetAngularVelocity()),
 			})
 	}
 	for _, f := range food {
@@ -140,7 +140,7 @@ func (g *Game) ViewPortRequest(sessionID uint64) (*messages.ViewportResponse, er
 				Y:     float32(pos.Y),
 			})
 	}
-	g.worldMutex.RUnlock()
+	//g.worldMutex.RUnlock()
 
 	return &response, nil
 }
@@ -229,6 +229,7 @@ func (g *Game) addFoodToWorld(x, y float64, score uint64, dispersion int) {
 	def.FixedRotation = false
 	def.AllowSleep = true
 
+
 	// Shape
 	shape := box2d.MakeB2CircleShape()
 	shape.M_radius = 1
@@ -260,7 +261,7 @@ func (g *Game) runSimulation(timeStep time.Duration, velocityIterations int, pos
 
 	g.worldMutex.Lock()
 	for i := 0; i < int(g.minFoodCount); i++ {
-		g.addFoodToWorld(float64(300+rand.Intn(int(g.widthX-300))), float64(300+rand.Intn(int(g.widthX-300))), 5, 1000)
+		g.addFoodToWorld(float64(30+rand.Intn(int(g.widthX-30))), float64(30+rand.Intn(int(g.widthX-30))), uint64(1+rand.Intn(3)), 1000)
 		log.Printf("Food <%d>\n", i)
 	}
 	atomic.AddUint64(&g.foodCount, g.minFoodCount)
@@ -395,7 +396,7 @@ func (g *Game) adjustFood() {
 	if foodCount < g.minFoodCount {
 		log.Println("ajustando", foodCount, g.minFoodCount)
 		for i := 0; i < N; i++ {
-			g.addFoodToWorld(float64(300+rand.Intn(int(g.widthX-300))), float64(300+rand.Intn(int(g.widthX-300))), 5, 1000)
+			g.addFoodToWorld(float64(30+rand.Intn(int(g.widthX-30))), float64(30+rand.Intn(int(g.widthX-30))), uint64(1+rand.Intn(3)), 1000)
 		}
 		atomic.AddUint64(&g.foodCount, N)
 	}

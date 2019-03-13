@@ -7,6 +7,7 @@ import (
 	"errors"
 	"github.com/x1m3/elixir/games/cookies/messages"
 	"io"
+	"time"
 )
 
 
@@ -30,6 +31,7 @@ func (c *WebsocketConnection) Close() error {
 }
 
 func (c *WebsocketConnection) WriteMessage(data []byte) error {
+	_ = c.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 	return c.conn.WriteMessage(c.messageType, data)
 }
 

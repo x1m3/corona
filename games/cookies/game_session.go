@@ -11,7 +11,7 @@ type gameSession struct {
 	sync.RWMutex
 	ID       uint64
 	userName string
-	score    uint64 // TODO: score should be an atomic counter
+	score    uint64
 	state    state
 	viewport viewport
 	box2dbody *box2d.B2Body
