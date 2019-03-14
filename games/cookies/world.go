@@ -21,8 +21,9 @@ type world struct {
 	width  float64
 	height float64
 
-	minFPS float64
-	maxFPS float64
+	minFPS     float64
+	maxFPS     float64
+	currentFPS float64
 
 	col2Cookies   chan *collision2CookiesDTO
 	colCookieFood chan *collissionCookieFoodDTO
@@ -47,11 +48,12 @@ func NewWorld(gs *gameSessions, w, h, minFPS, maxFPS float64, speed, turboSpeed 
 		height:        h,
 		minFPS:        minFPS,
 		maxFPS:        maxFPS,
+		currentFPS:    (maxFPS - minFPS) / 2,
 		col2Cookies:   chColl2Cookies,
 		colCookieFood: chCollCookieFood,
 		speed:         speed,
 		turboSpeed:    turboSpeed,
-		minFoodCount:  10000,
+		minFoodCount:  1000,
 		foodQueue:     list.NewLIFO(),
 	}
 	world.B2World.SetContactListener(newContactListener(chColl2Cookies, chCollCookieFood))
@@ -93,8 +95,9 @@ func (w *world) createWorld() {
 }
 
 func (w *world) runSimulation(velocityIterations int, positionIterations int) {
-	timeStep := time.Duration(time.Second / time.Duration((w.maxFPS-w.minFPS)/2))
-	timeStep64 := float64(timeStep) / float64(time.Second)
+	timeStep := time.Duration(time.Second / time.Duration(w.currentFPS))
+	timeStepBox2D := float64(timeStep) / float64(time.Second) // Seconds as a float
+	var notime int
 
 	w.worldMutex.Lock()
 	for i := 0; i < int(w.minFoodCount); i++ {
@@ -122,7 +125,7 @@ func (w *world) runSimulation(velocityIterations int, positionIterations int) {
 
 		w.worldMutex.Lock()
 
-		w.B2World.Step(timeStep64, velocityIterations, positionIterations)
+		w.B2World.Step(timeStepBox2D, velocityIterations, positionIterations)
 		w.removeBodies()
 		w.runFoodTasks()
 		w.adjustSpeedsAndSizes()
@@ -131,9 +134,23 @@ func (w *world) runSimulation(velocityIterations int, positionIterations int) {
 
 		elapsed := time.Since(t1)
 		if elapsed < timeStep {
+			notime--
 			time.Sleep(timeStep - elapsed)
 		} else {
-			log.Printf("WARNING: Cannot sustain frame rate. Expected time <%v>. Real time <%v>", timeStep, elapsed)
+			notime++
+			log.Printf("WARNING: Cannot sustain frame rate. Expected time <%v>. Real time <%v>. FPS <%f>", timeStep, elapsed, w.currentFPS)
+		}
+		if notime < -10 && w.currentFPS < w.maxFPS {
+			w.currentFPS++
+			timeStep = time.Duration(time.Second / time.Duration(w.currentFPS))
+			timeStepBox2D = float64(timeStep) / float64(time.Second) // Seconds as a float
+			notime=0
+		}
+		if notime > 4 && w.currentFPS > w.minFPS {
+			w.currentFPS--
+			timeStep = time.Duration(time.Second / time.Duration(w.currentFPS))
+			timeStepBox2D = float64(timeStep) / float64(time.Second) // Seconds as a float
+			notime=0
 		}
 	}
 }
