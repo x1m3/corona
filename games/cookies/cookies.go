@@ -88,7 +88,6 @@ func (g *Game) ViewPortRequest(sessionID uint64) (*messages.ViewportResponse, er
 				Score:           cookie.GetUserData().(*Cookie).Score,
 				X:               float32(pos.X),
 				Y:               float32(pos.Y),
-				AngularVelocity: float32(cookie.GetAngularVelocity()),
 			})
 	}
 	for _, f := range food {
