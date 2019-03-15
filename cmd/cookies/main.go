@@ -60,7 +60,7 @@ func main() {
 	go game.Init()
 	log.Println("Starting Server")
 
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 25; i++ {
 		bot := bots.New(game, bots.NewDummyBotAgent(100, 100))
 		go func(i int) {
 			log.Println("Bot started", i)

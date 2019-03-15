@@ -37,7 +37,9 @@ func (l *contactListener) BeginContact(contact box2d.B2ContactInterface) {
 	// Contact between cookie and food
 	if cookie, isACookie := data1.(*Cookie); isACookie {
 		if food, isFood := data2.(*Food); isFood {
-			l.contactBetweenCookiesAndFood(cookie, food)
+			if food.body.GetLinearVelocity().X<0.1 && food.body.GetLinearVelocity().Y<0.1 {
+				l.contactBetweenCookiesAndFood(cookie, food)
+			}
 			return
 		}
 	}

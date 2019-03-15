@@ -2,6 +2,7 @@ package cookies
 
 import (
 	"github.com/ByteArena/box2d"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/x1m3/elixir/pkg/list"
 	"log"
 	"math"
@@ -144,13 +145,13 @@ func (w *world) runSimulation(velocityIterations int, positionIterations int) {
 			w.currentFPS++
 			timeStep = time.Duration(time.Second / time.Duration(w.currentFPS))
 			timeStepBox2D = float64(timeStep) / float64(time.Second) // Seconds as a float
-			notime=0
+			notime = 0
 		}
 		if notime > 4 && w.currentFPS > w.minFPS {
 			w.currentFPS--
 			timeStep = time.Duration(time.Second / time.Duration(w.currentFPS))
 			timeStepBox2D = float64(timeStep) / float64(time.Second) // Seconds as a float
-			notime=0
+			notime = 0
 		}
 	}
 }
@@ -207,17 +208,21 @@ func (w *world) removeBodies() {
 }
 
 func (w *world) runFoodTasks() {
-
+	c := 0
 	for {
 		o := w.foodQueue.Pop()
-		if o == nil {
+		c++
+		if o == nil || c > 5 {
+			c = 0
 			return
 		}
 		task := o.(*throwFoodTask)
-		for i := 0; i < task.count; i += 5 {
-			//w.addFoodToWorld(task.x, task.y, 5, rand.Intn(10000))
+		for i := 0; i < task.count; i += 1 {
+			spew.Dump(task)
+			w.addFoodToWorld(task.x, task.y, 1, rand.Intn(1000))
 			//w.addFoodToWorld(float64(300+rand.Intn(int(w.width-300))), float64(300+rand.Intn(int(w.width-300))), 5, 1000)
 		}
+		atomic.AddUint64(&w.foodCount, uint64(task.count))
 	}
 
 }
