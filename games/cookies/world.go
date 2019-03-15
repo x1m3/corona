@@ -165,21 +165,17 @@ func (w *world) adjustSpeedsAndSizes() {
 		body := session.box2dbody
 		inertia := body.GetInertia()
 
-		// Angular speed
-		currentSpeed := body.M_angularVelocity
-		expectedSpeed := float64(session.getScore() / 10)
-		body.ApplyTorque(inertia*(expectedSpeed-currentSpeed)/2, true)
+		body.SetAngularVelocity(0)
 
-		// Linear speed, based on configuration, but also on spinning angular speed.
 		speedX := body.GetLinearVelocity().X
 		speedY := body.GetLinearVelocity().Y
-		currentSpeed = math.Sqrt(math.Pow(speedX, 2) + math.Pow(speedY, 2))
-		expectedSpeed = float64(w.speed)
+		currentSpeed := math.Sqrt(math.Pow(speedX, 2) + math.Pow(speedY, 2))
+		expectedSpeed := float64(w.speed)
 
-		// Consider adding a moving average here to smooth movements
-		magnitude := 1 * (expectedSpeed - currentSpeed) * inertia
+		magnitude := 2 * (expectedSpeed - currentSpeed) * inertia
 
 		vector := box2d.MakeB2Vec2(math.Cos(float64(session.viewport.angle)), math.Sin(float64(session.viewport.angle)))
+
 		if magnitude < 0 {
 			magnitude *= 0.005
 		}
@@ -190,7 +186,6 @@ func (w *world) adjustSpeedsAndSizes() {
 		data := body.GetUserData().(*Cookie)
 		if session.getScore() != data.Score {
 			data.Score = session.score
-
 			body.DestroyFixture(body.GetFixtureList())
 			body.CreateFixtureFromDef(w.getCookieFixtureDefByScore(data.Score))
 		}
