@@ -60,7 +60,6 @@ type CookieInfo struct {
 	Score           uint64  `json:"SC"`
 	X               float32 `json:"X"`
 	Y               float32 `json:"Y"`
-	AngularVelocity float32 `json:"AV"`
 }
 
 type FoodInfo struct {
@@ -92,7 +91,6 @@ func NewCreateCookieResponse(ID uint64, sc uint64, X float32, Y float32, Angular
 			Score:           sc,
 			X:               X,
 			Y:               Y,
-			AngularVelocity: AngularVelocity,
 		},
 	}
 	resp.SetType(CreateCookieResponseType)
