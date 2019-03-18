@@ -20,7 +20,7 @@ func New(widthX, widthY float64) *Game {
 
 	return &Game{
 		gSessions: gameSessions,
-		world:     NewWorld(gameSessions, widthX, widthY, 10, 60, 45, 70, 5000),
+		world:     NewWorld(gameSessions, widthX, widthY, 10, 45, 45, 70, 10000),
 		width:     widthX,
 		height:    widthY,
 	}

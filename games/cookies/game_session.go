@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"math/rand"
 	"github.com/ByteArena/box2d"
+	"sync/atomic"
 )
 
 type gameSession struct {
@@ -90,12 +91,29 @@ func (s *gameSession) startPlaying() error {
 	return nil
 }
 
-func (s *gameSession) getScore() uint64 {
-	s.RLock()
-	sc := s.score
-	s.RUnlock()
+func (s *gameSession) stopPlaying() error {
 
-	return sc
+	if _, ok := s.state.(*playingState); !ok {
+		return errors.New("not playing user wants to stop playing")
+	}
+
+	s.Lock()
+	s.state = &loggedState{}
+	s.Unlock()
+
+	return nil
+}
+
+func (s *gameSession) getScore() uint64 {
+	return atomic.LoadUint64(&s.score)
+}
+
+func (s *gameSession) setScore(i uint64) {
+	atomic.StoreUint64(&s.score, i)
+}
+
+func (s *gameSession) incScore(i uint64) {
+	atomic.AddUint64(&s.score, i)
 }
 
 

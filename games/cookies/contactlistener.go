@@ -2,24 +2,19 @@ package cookies
 
 import (
 	"github.com/ByteArena/box2d"
+	"time"
 )
 
-
 type contactListener struct {
-	chColl2Cookies chan *collision2CookiesDTO
+	chColl2Cookies   chan *collision2CookiesDTO
 	chCollCookieFood chan *collissionCookieFoodDTO
 }
 
 func newContactListener(chCkCk chan *collision2CookiesDTO, chCkFd chan *collissionCookieFoodDTO) *contactListener {
-	return &contactListener{chColl2Cookies:chCkCk, chCollCookieFood:chCkFd}
+	return &contactListener{chColl2Cookies: chCkCk, chCollCookieFood: chCkFd}
 }
 
 func (l *contactListener) BeginContact(contact box2d.B2ContactInterface) {
-
-	if !contact.IsTouching() {
-		return
-	}
-
 	body1 := contact.GetFixtureA().GetBody()
 	body2 := contact.GetFixtureB().GetBody()
 
@@ -37,9 +32,7 @@ func (l *contactListener) BeginContact(contact box2d.B2ContactInterface) {
 	// Contact between cookie and food
 	if cookie, isACookie := data1.(*Cookie); isACookie {
 		if food, isFood := data2.(*Food); isFood {
-			if food.body.GetLinearVelocity().X<0.1 && food.body.GetLinearVelocity().Y<0.1 {
-				l.contactBetweenCookiesAndFood(cookie, food)
-			}
+			l.contactBetweenCookiesAndFood(cookie, food)
 			return
 		}
 	}
@@ -54,7 +47,8 @@ func (l *contactListener) BeginContact(contact box2d.B2ContactInterface) {
 }
 
 func (l *contactListener) EndContact(contact box2d.B2ContactInterface) {
-	return
+
+
 }
 
 func (l *contactListener) PreSolve(contact box2d.B2ContactInterface, oldManifold box2d.B2Manifold) {
@@ -66,9 +60,11 @@ func (l *contactListener) PostSolve(contact box2d.B2ContactInterface, impulse *b
 }
 
 func (l *contactListener) contactBetweenCookies(cookie1 *Cookie, cookie2 *Cookie) {
-	l.chColl2Cookies <- &collision2CookiesDTO{cookie1:cookie1, cookie2:cookie2}
+	l.chColl2Cookies <- &collision2CookiesDTO{cookie1: cookie1, cookie2: cookie2}
 }
 
 func (l *contactListener) contactBetweenCookiesAndFood(cookie *Cookie, food *Food) {
-	l.chCollCookieFood <- &collissionCookieFoodDTO{cookie:cookie, food:food}
+	if time.Since(food.createdOn) > 1000*time.Millisecond {
+		l.chCollCookieFood <- &collissionCookieFoodDTO{cookie: cookie, food: food}
+	}
 }
