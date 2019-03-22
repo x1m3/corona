@@ -41,8 +41,11 @@ func (g *Game) UserJoin(sessionID uint64, req *messages.UserJoinRequest) (*messa
 		return nil, err
 	}
 
-	// TODO: Change type name and inform if login was ok
 	return messages.NewUserJoinResponse(true, nil), nil
+}
+
+func (g *Game) Logout(sessionID uint64) {
+	g.gSessions.close(sessionID)
 }
 
 func (g *Game) CreateCookie(sessionID uint64, req *messages.CreateCookieRequest) (*messages.CreateCookieResponse, error) {
@@ -65,6 +68,12 @@ func (g *Game) CreateCookie(sessionID uint64, req *messages.CreateCookieRequest)
 }
 
 func (g *Game) ViewPortRequest(sessionID uint64) (*messages.ViewportResponse, error) {
+
+	// TODO: Look for a better session existance
+	session := g.gSessions.session(sessionID)
+	if session == nil {
+		return nil, errors.New("session doesn't exists")
+	}
 
 	v, err := g.gSessions.session(sessionID).getViewport()
 	if err != nil {

@@ -142,6 +142,7 @@ func manageRemoteView(transport *cookies.Transport, sessionID uint64, updatePeri
 		err = transport.Send(req)
 		if err != nil {
 			log.Printf("Socket broken while writing. Closing connection. Err:<%v>", err)
+			game.Logout(sessionID)
 			transport.Close()
 			return
 		}
@@ -156,6 +157,7 @@ func handleWSRequests(transport *cookies.Transport, sessionID uint64) {
 		msg, err := transport.Receive()
 		if err != nil {
 			log.Printf("Closing conection. Err:<%v>", err)
+			game.Logout(sessionID)
 			transport.Close()
 			return
 		}

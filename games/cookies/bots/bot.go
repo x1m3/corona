@@ -3,6 +3,7 @@ package bots
 import (
 	"github.com/x1m3/elixir/games/cookies"
 	"github.com/x1m3/elixir/games/cookies/messages"
+	"log"
 	"time"
 )
 
@@ -18,11 +19,13 @@ type BotAgent interface {
 type Bot struct {
 	game   *cookies.Game
 	agent  BotAgent
+	sessionID uint64
+	ticker *time.Ticker
 	finish chan bool
 }
 
 func New(game *cookies.Game, bot BotAgent) *Bot {
-	return &Bot{game: game, agent: bot}
+	return &Bot{game: game, agent: bot, ticker: time.NewTicker(250 * time.Millisecond), finish: make(chan bool, 1)}
 }
 
 // Run makes a bot to connect to the game and start playing. It should be
@@ -32,40 +35,46 @@ func (b *Bot) Run() error {
 	var err error
 
 	// Creating a session
-	sessionID := b.game.NewSession()
+	b.sessionID = b.game.NewSession()
 
 	// Joining step1
-	resp, err = b.game.UserJoin(sessionID, b.agent.Join())
+	resp, err = b.game.UserJoin(b.sessionID, b.agent.Join())
 	if err != nil {
 		return err
 	}
 	b.agent.JoinResponse(resp.(*messages.UserJoinResponse))
 
 	// StartPlaying
-	resp, err = b.game.CreateCookie(sessionID, b.agent.CreateCookie())
+	resp, err = b.game.CreateCookie(b.sessionID, b.agent.CreateCookie())
 	if err != nil {
 		return err
 	}
 	b.agent.CreateCookieResponse(resp.(*messages.CreateCookieResponse))
 
-	b.game.UpdateViewPortRequest(sessionID, b.agent.Move())
+	b.game.UpdateViewPortRequest(b.sessionID, b.agent.Move())
 
-	ticker := time.NewTicker(20 * time.Millisecond)
 	for {
 		select {
-		case <-ticker.C:
-			resp, err := b.game.ViewPortRequest(sessionID)
+		case <-b.ticker.C:
+			resp, err := b.game.ViewPortRequest(b.sessionID)
 			if err != nil {
-				return err
+				b.destroy()
+				return nil
 			}
 			b.agent.UpdateViewWorld(resp)
-			b.game.UpdateViewPortRequest(sessionID, b.agent.Move())
+			b.game.UpdateViewPortRequest(b.sessionID, b.agent.Move())
 
 		case <-b.finish:
-			// TODO: Do more things to close properly
+			b.destroy()
 			return nil
 		}
 	}
+}
+
+func (b *Bot) destroy() {
+	b.ticker.Stop()
+	b.game.Logout(b.sessionID)
+	log.Println("Bot disconnected")
 }
 
 func (b *Bot) Destroy() {

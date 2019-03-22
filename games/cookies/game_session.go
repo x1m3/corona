@@ -28,7 +28,7 @@ type viewport struct {
 }
 
 var errUserWasLogged = errors.New("user already logged")
-var errCannotSendScreenUpdates = errors.New("session not found")
+var errCannotSendScreenUpdates = errors.New("cannot send screen updates")
 
 func newGameSession(id uint64) *gameSession {
 	return &gameSession{ID: id, state: &notLoggedState{}, score: 100}
@@ -149,6 +149,14 @@ func (s *gameSessions) add() uint64 {
 	s.sessions[ID] = newGameSession(ID)
 	s.Unlock()
 	return ID
+}
+
+func (s *gameSessions) close(ID uint64)  {
+	s.Lock()
+	_ = s.sessions[ID].stopPlaying()
+	delete(s.sessions, ID)
+	s.Unlock()
+	return
 }
 
 func (s *gameSessions) session(id uint64) *gameSession {

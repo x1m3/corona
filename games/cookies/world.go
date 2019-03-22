@@ -193,11 +193,6 @@ func (w *world) adjustSpeedsAndSizes() {
 
 func (w *world) removeBodies() {
 	w.bodies2Destroy.Range(func(id interface{}, body interface{}) bool {
-		// TODO: Sólo tienen sesion las cookies!!!!!!! Y por aquí también pasa la comida, joder!!!!
-		err := w.gSessions.session(id.(uint64)).stopPlaying()
-		if err!=nil {
-			log.Println(err)
-		}
 		w.B2World.DestroyBody(body.(*box2d.B2Body))
 		w.bodies2Destroy.Delete(id)
 		return true
@@ -227,7 +222,6 @@ func (w *world) adjustFood() {
 	const N = 500
 
 	foodCount := atomic.LoadUint64(&w.foodCount)
-	log.Println(foodCount)
 
 	if foodCount < w.minFoodCount {
 		log.Println("ajustando", foodCount, w.minFoodCount)
@@ -318,13 +312,24 @@ func (w *world) listenContactBetweenCookies() {
 		w.gSessions.session(cookie1.ID).setScore(uint64(math.Floor(newScore1)))
 		w.gSessions.session(cookie2.ID).setScore(uint64(math.Floor(newScore2)))
 
+		// Throw some food
+		w.foodQueue.Push(newThrowFoodTask(int(math.Floor(diff)/2), (cookie1.body.GetPosition().X+cookie2.body.GetPosition().X)/2, (cookie1.body.GetPosition().Y+cookie2.body.GetPosition().Y)/2))
+
 		if newScore1 < 50 {
+			if err := w.gSessions.session(cookie1.ID).stopPlaying(); err!=nil {
+				log.Println(err)
+			}
 			w.bodies2Destroy.Store(cookie1.ID, cookie1.body)
+
 			// TODO: Notify explotion, update session
 			continue
 		}
 		if newScore2 < 50 {
+			if err := w.gSessions.session(cookie2.ID).stopPlaying(); err!=nil {
+				log.Println(err)
+			}
 			w.bodies2Destroy.Store(cookie2.ID, cookie2.body)
+
 			// TODO: Notify explotion, update session
 			continue
 		}
@@ -340,11 +345,6 @@ func (w *world) listenContactBetweenCookies() {
 		data.lastCookieContact = time.Now()
 		cookie2.body.SetUserData(data)
 
-		// TODO: Adjust size, probably with a new list
-
-		// Throw some food
-		w.foodQueue.Push(newThrowFoodTask(int(0.1*(score1-newScore1)), cookie1.body.GetPosition().X, cookie1.body.GetPosition().Y))
-		w.foodQueue.Push(newThrowFoodTask(int(0.1*(score2-newScore2)), cookie2.body.GetPosition().X, cookie2.body.GetPosition().Y))
 	}
 }
 
