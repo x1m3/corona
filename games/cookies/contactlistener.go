@@ -15,6 +15,10 @@ func newContactListener(chCkCk chan *collision2CookiesDTO, chCkFd chan *collissi
 }
 
 func (l *contactListener) BeginContact(contact box2d.B2ContactInterface) {
+
+}
+
+func (l *contactListener) EndContact(contact box2d.B2ContactInterface) {
 	body1 := contact.GetFixtureA().GetBody()
 	body2 := contact.GetFixtureB().GetBody()
 
@@ -44,11 +48,6 @@ func (l *contactListener) BeginContact(contact box2d.B2ContactInterface) {
 			return
 		}
 	}
-}
-
-func (l *contactListener) EndContact(contact box2d.B2ContactInterface) {
-
-
 }
 
 func (l *contactListener) PreSolve(contact box2d.B2ContactInterface, oldManifold box2d.B2Manifold) {

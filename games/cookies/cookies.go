@@ -45,6 +45,7 @@ func (g *Game) UserJoin(sessionID uint64, req *messages.UserJoinRequest) (*messa
 }
 
 func (g *Game) Logout(sessionID uint64) {
+	g.world.removeCookie(g.gSessions.session(sessionID).box2dbody)
 	g.gSessions.close(sessionID)
 }
 

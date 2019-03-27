@@ -1,6 +1,7 @@
 package cookies
 
 import (
+	"fmt"
 	"github.com/ByteArena/box2d"
 	"github.com/x1m3/elixir/pkg/list"
 	"log"
@@ -193,10 +194,17 @@ func (w *world) adjustSpeedsAndSizes() {
 
 func (w *world) removeBodies() {
 	w.bodies2Destroy.Range(func(id interface{}, body interface{}) bool {
+		body.(*box2d.B2Body).SetActive(false)
 		w.B2World.DestroyBody(body.(*box2d.B2Body))
 		w.bodies2Destroy.Delete(id)
 		return true
 	})
+}
+
+func (w *world) removeCookie(body *box2d.B2Body) {
+	w.worldMutex.Lock()
+	w.B2World.DestroyBody(body)
+	w.worldMutex.Unlock()
 }
 
 func (w *world) runFoodTasks() {
@@ -302,6 +310,11 @@ func (w *world) listenContactBetweenCookies() {
 
 		cookie1, cookie2 := collision.cookie1, collision.cookie2
 
+		if !w.gSessions.session(cookie1.ID).inPlayingState() || !w.gSessions.session(cookie2.ID).inPlayingState() {
+			fmt.Println("######################## Colision con cookie que no está jugando ya ################")
+			continue
+		}
+
 		score1, score2 := float64(cookie1.Score), float64(cookie2.Score)
 
 		diff := math.Abs(score1 - score2)
@@ -321,7 +334,7 @@ func (w *world) listenContactBetweenCookies() {
 			}
 			w.bodies2Destroy.Store(cookie1.ID, cookie1.body)
 
-			// TODO: Notify explotion, update session
+			// TODO: Notify explotion
 			continue
 		}
 		if newScore2 < 50 {
@@ -330,7 +343,7 @@ func (w *world) listenContactBetweenCookies() {
 			}
 			w.bodies2Destroy.Store(cookie2.ID, cookie2.body)
 
-			// TODO: Notify explotion, update session
+			// TODO: Notify explotion
 			continue
 		}
 
@@ -354,6 +367,11 @@ func (w *world) listenContactBetweenCookiesAndFood() {
 
 		cookie := collision.cookie
 		food := collision.food
+
+		if !w.gSessions.session(cookie.ID).inPlayingState() {
+			fmt.Println("######################## Colision con cookie que no está jugando ya y comida ################")
+			continue
+		}
 
 
 		w.gSessions.session(cookie.ID).incScore(food.Score)

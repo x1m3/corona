@@ -1,6 +1,7 @@
 package cookies
 
 import (
+	"log"
 	"sync"
 	"github.com/pkg/errors"
 	"math/rand"
@@ -78,6 +79,13 @@ func (s *gameSession) inLoggedState() bool {
 	return logged
 }
 
+func (s *gameSession) inPlayingState() bool {
+	s.RLock()
+	_,  playing := s.state.(*playingState)
+	s.RUnlock()
+	return playing
+}
+
 func (s *gameSession) startPlaying() error {
 
 	if _, ok := s.state.(*loggedState); !ok {
@@ -153,8 +161,13 @@ func (s *gameSessions) add() uint64 {
 
 func (s *gameSessions) close(ID uint64)  {
 	s.Lock()
-	_ = s.sessions[ID].stopPlaying()
-	delete(s.sessions, ID)
+	if session, found := s.sessions[ID]; found {
+		log.Printf("Closing session <%d>\n", ID)
+		if err := session.stopPlaying();err!=nil {
+			log.Println(err)
+		}
+		delete(s.sessions, ID)
+	}
 	s.Unlock()
 	return
 }
