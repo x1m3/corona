@@ -203,6 +203,7 @@ func (w *world) removeBodies() {
 
 func (w *world) removeCookie(body *box2d.B2Body) {
 	w.worldMutex.Lock()
+	body.SetActive(false)
 	w.B2World.DestroyBody(body)
 	w.worldMutex.Unlock()
 }

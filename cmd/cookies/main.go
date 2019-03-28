@@ -2,16 +2,15 @@ package main
 
 import (
 	"fmt"
+	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
+	"github.com/x1m3/elixir/games/cookies"
 	"github.com/x1m3/elixir/games/cookies/bots"
-
+	"html/template"
+	"io"
+	"log"
 	"net/http"
 	"time"
-	"github.com/gorilla/mux"
-	"io"
-	"html/template"
-	"github.com/gorilla/websocket"
-	"log"
-	"github.com/x1m3/elixir/games/cookies"
 
 	"github.com/x1m3/elixir/games/cookies/codec/json"
 	"github.com/x1m3/elixir/games/cookies/messages"
@@ -61,8 +60,8 @@ func main() {
 	log.Println("Starting Server")
 
 	for i := 0; i < 25; i++ {
-		bot := bots.New(game, bots.NewDummyBotAgent(100, 100))
 		go func(i int) {
+			bot := bots.New(game, bots.NewDummyBotAgent(100, 100))
 			log.Println("Bot started", i)
 			if err := bot.Run(); err != nil {
 				log.Println(err)
