@@ -84,7 +84,7 @@ type CreateCookieResponse struct {
 	Data CookieInfo `json:"d"`
 }
 
-func NewCreateCookieResponse(ID uint64, sc uint64, X float32, Y float32, AngularVelocity float32) *CreateCookieResponse {
+func NewCreateCookieResponse(ID uint64, sc uint64, X float32, Y float32) *CreateCookieResponse {
 	resp := &CreateCookieResponse{
 		Data: CookieInfo{
 			ID:              ID,
