@@ -2,12 +2,16 @@ package cookies
 
 import (
 	"errors"
+	"fmt"
+	"github.com/ByteArena/box2d"
 	"github.com/x1m3/elixir/games/cookies/messages"
+	"github.com/x1m3/elixir/games/cookies/sessionmanager"
+	"log"
 	"math/rand"
 )
 
 type Game struct {
-	gSessions *gameSessions
+	gSessions *sessionmanager.Sessions
 	world     *world
 	width     float64
 	height    float64
@@ -16,7 +20,7 @@ type Game struct {
 // New returns a new cookies game.
 func New(widthX, widthY float64) *Game {
 
-	gameSessions := newGameSessions()
+	gameSessions := sessionmanager.New()
 
 	return &Game{
 		gSessions: gameSessions,
@@ -28,16 +32,16 @@ func New(widthX, widthY float64) *Game {
 
 func (g *Game) Init() {
 	g.world.createWorld()
-	go g.world.runSimulation( 4, 1)
+	go g.world.runSimulation(4, 1)
 }
 
 func (g *Game) NewSession() uint64 {
-	return g.gSessions.add()
+	return g.gSessions.Add()
 }
 
 func (g *Game) UserJoin(sessionID uint64, req *messages.UserJoinRequest) (*messages.UserJoinResponse, error) {
 
-	if err := g.gSessions.session(sessionID).login(req.Username); err != nil {
+	if err := g.gSessions.Login(sessionID, req.Username); err != nil {
 		return nil, err
 	}
 
@@ -45,38 +49,58 @@ func (g *Game) UserJoin(sessionID uint64, req *messages.UserJoinRequest) (*messa
 }
 
 func (g *Game) Logout(sessionID uint64) {
-	g.world.removeCookie(g.gSessions.session(sessionID).box2dbody)
-	g.gSessions.close(sessionID)
+	var body *box2d.B2Body
+	var err error
+
+	if body, err = g.gSessions.GetCookieBody(sessionID); err != nil {
+		log.Printf("Error on Logout. <%s>", err)
+		return
+	}
+
+	if body != nil {
+		g.world.removeCookie(body)
+	}
+	if err := g.gSessions.Close(sessionID); err != nil {
+		log.Printf("Error on Logout. <%s>", err)
+		return
+	}
 }
 
 func (g *Game) CreateCookie(sessionID uint64, req *messages.CreateCookieRequest) (*messages.CreateCookieResponse, error) {
 
-	session := g.gSessions.session(sessionID)
+	isLogged, err := g.gSessions.IsLogged(sessionID)
+	if err != nil {
+		log.Printf("Error with inconsistent session state. <%s>", err)
+		return nil, err
+	}
 
-	if !session.inLoggedState() {
+	if !isLogged {
 		return nil, errors.New("not logged user wants to play")
 	}
 
 	x := float64(300 + rand.Intn(int(g.width-300)))
 	y := float64(300 + rand.Intn(int(g.height-300)))
 
-	session.setBox2DBody(g.world.addCookieToWorld(x, y, session))
-
-	if err := session.startPlaying(); err != nil {
+	score, err := g.gSessions.GetScore(sessionID)
+	if err != nil {
+		log.Printf("Error getting session score. <%s>", err)
 		return nil, err
 	}
-	return messages.NewCreateCookieResponse(sessionID, session.getScore(), float32(x), float32(y), 10), nil
+
+	err = g.gSessions.SetCookieBody(sessionID, g.world.addCookieToWorld(x, y, sessionID, score))
+	if err != nil {
+		log.Printf("Error adding cookie to session, <%s>", err)
+	}
+
+	if err := g.gSessions.StartPlaying(sessionID); err != nil {
+		return nil, err
+	}
+	return messages.NewCreateCookieResponse(sessionID, score, float32(x), float32(y)), nil
 }
 
 func (g *Game) ViewPortRequest(sessionID uint64) (*messages.ViewportResponse, error) {
 
-	// TODO: Look for a better session existance
-	session := g.gSessions.session(sessionID)
-	if session == nil {
-		return nil, errors.New("session doesn't exists")
-	}
-
-	v, err := g.gSessions.session(sessionID).getViewport()
+	v, err := g.gSessions.GetViewport(sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -94,10 +118,10 @@ func (g *Game) ViewPortRequest(sessionID uint64) (*messages.ViewportResponse, er
 		response.Cookies = append(
 			response.Cookies,
 			&messages.CookieInfo{
-				ID:              cookie.GetUserData().(*Cookie).ID,
-				Score:           cookie.GetUserData().(*Cookie).Score,
-				X:               float32(pos.X),
-				Y:               float32(pos.Y),
+				ID:    cookie.GetUserData().(*Cookie).ID,
+				Score: cookie.GetUserData().(*Cookie).Score,
+				X:     float32(pos.X),
+				Y:     float32(pos.Y),
 			})
 	}
 	for _, f := range food {
@@ -116,5 +140,8 @@ func (g *Game) ViewPortRequest(sessionID uint64) (*messages.ViewportResponse, er
 }
 
 func (g *Game) UpdateViewPortRequest(sessionID uint64, req *messages.ViewPortRequest) {
-	g.gSessions.session(sessionID).updateViewPort(req.X, req.Y, req.XX, req.YY, req.Angle, req.Turbo)
+	err := g.gSessions.SetViewport(sessionID, req.X, req.Y, req.XX, req.YY, req.Angle, req.Turbo)
+	if err != nil {
+		fmt.Printf("Error updating viewport <%s>", err)
+	}
 }

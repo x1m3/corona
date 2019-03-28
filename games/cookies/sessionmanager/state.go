@@ -1,4 +1,4 @@
-package cookies
+package sessionmanager
 
 type state interface {
 	mustBeLogged() bool
