@@ -59,7 +59,7 @@ func main() {
 	go game.Init()
 	log.Println("Starting Server")
 
-	for i := 0; i < 25; i++ {
+	for i := 0; i < 500; i++ {
 		go func(i int) {
 			bot := bots.New(game, bots.NewDummyBotAgent(100, 100))
 			log.Println("Bot started", i)
@@ -130,8 +130,11 @@ func wsAction(resp http.ResponseWriter, req *http.Request) {
 
 func manageRemoteView(transport *cookies.Transport, sessionID uint64, updatePeriod time.Duration) {
 
+	ticker := time.NewTicker(updatePeriod)
+	defer ticker.Stop()
+
 	for {
-		time.Sleep(updatePeriod)
+		<-ticker.C
 		req, err := game.ViewPortRequest(sessionID)
 		if err != nil {
 			// Do nothing. Probably, game is not in playing state

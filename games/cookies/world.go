@@ -136,13 +136,15 @@ func (w *world) runSimulation(velocityIterations int, positionIterations int) {
 			notime++
 			log.Printf("WARNING: Cannot sustain frame rate. Expected time <%v>. Real time <%v>. FPS <%f>", timeStep, elapsed, w.currentFPS)
 		}
-		if notime < -10 && w.currentFPS < w.maxFPS {
+		if notime < -60 && w.currentFPS < w.maxFPS {
+			log.Println("FPS up")
 			w.currentFPS++
 			timeStep = time.Duration(time.Second / time.Duration(w.currentFPS))
 			timeStepBox2D = float64(timeStep) / float64(time.Second) // Seconds as a float
 			notime = 0
 		}
-		if notime > 4 && w.currentFPS > w.minFPS {
+		if notime > 0 && w.currentFPS > w.minFPS {
+			log.Println("FPS down")
 			w.currentFPS--
 			timeStep = time.Duration(time.Second / time.Duration(w.currentFPS))
 			timeStepBox2D = float64(timeStep) / float64(time.Second) // Seconds as a float
@@ -269,6 +271,8 @@ func (w *world) addFoodToWorld(x, y float64, score uint64, dispersion int) {
 	fd.Density = 1
 	fd.Restitution = 0
 	fd.Friction = 1
+
+	fd.Filter.GroupIndex= -1 // Food do not collide
 
 	// Create body
 	body := w.B2World.CreateBody(&def)
