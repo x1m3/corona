@@ -372,10 +372,10 @@
         var angle = Math.atan2((game.input.worldY / game.world.scale.y - cookie.y), (game.input.worldX / game.world.scale.x - cookie.x));
 
         var msg = new ViewPortRequest(
-            0.95 * pixels2Meters(cam.x / game.world.scale.x),
-            0.95 * pixels2Meters(cam.y / game.world.scale.y),
-            1.05 * pixels2Meters((cam.x + cam.width) / game.world.scale.x),
-            1.05 * pixels2Meters((cam.y + cam.height) / game.world.scale.y),
+            0.7 * pixels2Meters(cam.x / game.world.scale.x),
+            0.7 * pixels2Meters(cam.y / game.world.scale.y),
+            1.3 * pixels2Meters((cam.x + cam.width) / game.world.scale.x),
+            1.3 * pixels2Meters((cam.y + cam.height) / game.world.scale.y),
             angle,
             this.game.input.activePointer.isDown
         );

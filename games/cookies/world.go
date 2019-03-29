@@ -191,7 +191,6 @@ func (w *world) adjustSpeedsAndSizes() {
 		score, _ := w.gSessions.GetScore(sessionID)
 		if score != data.Score {
 			data.Score = score
-
 			body.DestroyFixture(body.GetFixtureList())
 			body.CreateFixtureFromDef(w.getCookieFixtureDefByScore(score))
 		}
@@ -337,8 +336,8 @@ func (w *world) listenContactBetweenCookies() {
 
 		diff := math.Abs(score1 - score2)
 
-		newScore1 := score1 - 0.1*score1 - diff
-		newScore2 := score2 - 0.1*score2 - diff
+		newScore1 := math.Max(0, score1 - 0.1*score1 - diff)
+		newScore2 := math.Max(0, score2 - 0.1*score2 - diff)
 
 		_ = w.gSessions.SetScore(cookie1.ID, uint64(math.Floor(newScore1)))
 		_ = w.gSessions.SetScore(cookie2.ID, uint64(math.Floor(newScore2)))
