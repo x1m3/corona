@@ -338,16 +338,28 @@ func (w *world) listenContactBetweenCookies() {
 
 		score1, score2 := float64(cookie1.Score), float64(cookie2.Score)
 
-		diff := math.Abs(score1 - score2)
 
-		newScore1 := math.Max(0, score1 - 0.1*score1 - diff)
-		newScore2 := math.Max(0, score2 - 0.1*score2 - diff)
+		var diff, newScore1, newScore2, ratio1, ratio2 float64
+
+		if score1>score2 {
+			ratio1, ratio2 = score2/score1, 1-(score2/score1)
+			diff = math.Min(score1-score2, score2)
+
+		} else {
+			ratio1, ratio2 = 1 - (score1/score2), score1/score2
+			diff = math.Min(score2-score1, score1)
+		}
+
+		newScore1 = math.Max(0, score1 - 0.1*score1 - diff * ratio1)
+		newScore2 = math.Max(0, score2 - 0.1*score2 - diff * ratio2)
+
 
 		_ = w.gSessions.SetScore(cookie1.ID, uint64(math.Floor(newScore1)))
 		_ = w.gSessions.SetScore(cookie2.ID, uint64(math.Floor(newScore2)))
 
 		// Throw some food
-		w.foodQueue.Push(newThrowFoodTask(int(math.Floor(diff)/2), (cookie1.body.GetPosition().X+cookie2.body.GetPosition().X)/2, (cookie1.body.GetPosition().Y+cookie2.body.GetPosition().Y)/2))
+		w.foodQueue.Push(newThrowFoodTask(int(math.Floor(diff)), (cookie1.body.GetPosition().X+cookie2.body.GetPosition().X)/2, (cookie1.body.GetPosition().Y+cookie2.body.GetPosition().Y)/2))
+
 
 		if newScore1 < 50 {
 			if err := w.gSessions.StopPlaying(cookie1.ID); err != nil {
