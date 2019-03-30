@@ -56,7 +56,7 @@ func (b *Bot) Run() error {
 	for {
 		select {
 		case <-b.ticker.C:
-			resp, err := b.game.ViewPortRequest(b.sessionID)
+			resp, err := b.game.UpdateViewportResponse(b.sessionID)
 			if err != nil {
 				b.destroy()
 				return nil

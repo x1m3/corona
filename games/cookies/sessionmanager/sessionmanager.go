@@ -6,15 +6,18 @@ import (
 	"math/rand"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type gameSession struct {
-	ID        uint64
-	userName  string
-	score     uint64
-	state     state
-	viewport  Viewport
-	box2dbody *box2d.B2Body
+	ID                          uint64
+	userName                    string
+	score                       uint64
+	state                       state
+	viewportRequest             Viewport
+	lastViewportResponseRequest time.Time
+	viewportResponse            *ViewPortResponse
+	box2dbody                   *box2d.B2Body
 }
 
 type Viewport struct {
@@ -26,7 +29,13 @@ type Viewport struct {
 	Turbo bool
 }
 
+type ViewPortResponse struct {
+	Cookies []*box2d.B2Body
+	Food    []*box2d.B2Body
+}
+
 var errSessionNotFound = errors.New("session not found")
+var errViewportResponseEmpty = errors.New("viewportresponse is still empty")
 var errUserWasLogged = errors.New("user already logged")
 var errCannotSendScreenUpdates = errors.New("cannot send screen updates")
 
@@ -36,27 +45,43 @@ const WriteMode = 2
 type gameSessionFunc func(s *gameSession) (interface{}, error)
 
 func newGameSession(id uint64) *gameSession {
-	return &gameSession{ID: id, state: &notLoggedState{}, score: 100}
+	return &gameSession{ID: id, state: &notLoggedState{}, score: 100, lastViewportResponseRequest: time.Now()}
 }
 
-func (s *gameSession) getViewport() (*Viewport, error) {
+func (s *gameSession) getViewportRequest() (*Viewport, error) {
 
 	if !s.state.canSendScreenUpdates() {
 		return nil, errCannotSendScreenUpdates
 	}
 
-	return &s.viewport, nil
+	return &s.viewportRequest, nil
 }
 
-func (s *gameSession) updateViewPort(x, y, xx, yy float32, a float32, t bool) {
+func (s *gameSession) updateViewportRequest(x, y, xx, yy float32, a float32, t bool) {
 	if s.state.canSendScreenUpdates() {
-		s.viewport.X = x
-		s.viewport.Y = y
-		s.viewport.XX = xx
-		s.viewport.YY = yy
-		s.viewport.Angle = a
-		s.viewport.Turbo = t
+		s.viewportRequest.X = x
+		s.viewportRequest.Y = y
+		s.viewportRequest.XX = xx
+		s.viewportRequest.YY = yy
+		s.viewportRequest.Angle = a
+		s.viewportRequest.Turbo = t
 	}
+}
+
+func (s *gameSession) updateViewportResponse(v *ViewPortResponse) {
+	s.viewportResponse = v
+}
+
+func (s *gameSession) getViewportResponse() (*ViewPortResponse, error) {
+
+	if !s.state.canSendScreenUpdates() {
+		return nil, errCannotSendScreenUpdates
+	}
+
+	if s.viewportResponse == nil {
+		return nil, errViewportResponseEmpty
+	}
+	return s.viewportResponse, nil
 }
 
 func (s *gameSession) login(username string) error {
@@ -196,12 +221,12 @@ func (s *Sessions) GetScore(id uint64) (uint64, error) {
 	return score.(uint64), err
 }
 
-func (s *Sessions) GetViewport(id uint64) (*Viewport, error) {
+func (s *Sessions) GetViewportRequest(id uint64) (*Viewport, error) {
 	v, err := s.ensure(
 		id,
 		func() gameSessionFunc {
 			return func(session *gameSession) (interface{}, error) {
-				return session.getViewport()
+				return session.getViewportRequest()
 			}
 		}(),
 		ReadMode)
@@ -209,6 +234,21 @@ func (s *Sessions) GetViewport(id uint64) (*Viewport, error) {
 		return nil, err
 	}
 	return v.(*Viewport), err
+}
+func (s *Sessions) GetViewportResponse(id uint64) (*ViewPortResponse, error) {
+	v, err := s.ensure(
+		id,
+		func() gameSessionFunc {
+			return func(session *gameSession) (interface{}, error) {
+				session.lastViewportResponseRequest = time.Now()
+				return session.getViewportResponse()
+			}
+		}(),
+		ReadMode)
+	if err != nil {
+		return nil, err
+	}
+	return v.(*ViewPortResponse), err
 }
 
 func (s *Sessions) IsLogged(id uint64) (bool, error) {
@@ -277,12 +317,25 @@ func (s *Sessions) SetCookieBody(id uint64, body *box2d.B2Body) error {
 	return err
 }
 
-func (s *Sessions) SetViewport(id uint64, x, y, xx, yy float32, a float32, t bool) error {
+func (s *Sessions) SetViewportRequest(id uint64, x, y, xx, yy float32, a float32, t bool) error {
 	_, err := s.ensure(
 		id,
 		func() gameSessionFunc {
 			return func(session *gameSession) (interface{}, error) {
-				session.updateViewPort(x, y, xx, yy, a, t)
+				session.updateViewportRequest(x, y, xx, yy, a, t)
+				return nil, nil
+			}
+		}(),
+		WriteMode)
+	return err
+}
+
+func (s *Sessions) SetViewportResponse(id uint64, v *ViewPortResponse) error {
+	_, err := s.ensure(
+		id,
+		func() gameSessionFunc {
+			return func(session *gameSession) (interface{}, error) {
+				session.updateViewportResponse(v)
 				return nil, nil
 			}
 		}(),
@@ -301,6 +354,25 @@ func (s *Sessions) SetScore(id uint64, score uint64) error {
 		}(),
 		WriteMode)
 	return err
+}
+
+func (s *Sessions) ShouldUpdateViewportResponse(id uint64, updatePeriod time.Duration) bool {
+	toUpdate, err := s.ensure(
+		id,
+		func() gameSessionFunc {
+			return func(session *gameSession) (interface{}, error) {
+				if time.Since(session.lastViewportResponseRequest)>time.Duration(0.7 * float64(updatePeriod)) {
+					return true, nil
+				}
+				return false, nil
+			}
+		}(),
+		ReadMode)
+	if err != nil {
+		return false
+	}
+	return toUpdate.(bool)
+
 }
 
 func (s *Sessions) IncScore(id uint64, score uint64) error {

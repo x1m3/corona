@@ -8,25 +8,28 @@ import (
 	"github.com/x1m3/elixir/games/cookies/sessionmanager"
 	"log"
 	"math/rand"
+	"time"
 )
 
 type Game struct {
-	gSessions *sessionmanager.Sessions
-	world     *world
-	width     float64
-	height    float64
+	gSessions          *sessionmanager.Sessions
+	world              *world
+	width              float64
+	height             float64
+	updateClientPeriod time.Duration
 }
 
 // New returns a new cookies game.
-func New(widthX, widthY float64) *Game {
+func New(widthX, widthY float64, updateClientPeriod time.Duration) *Game {
 
 	gameSessions := sessionmanager.New()
 
 	return &Game{
-		gSessions: gameSessions,
-		world:     NewWorld(gameSessions, widthX, widthY, 10, 30, 45, 70, 2500),
-		width:     widthX,
-		height:    widthY,
+		gSessions:          gameSessions,
+		world:              NewWorld(gameSessions, widthX, widthY, 30, 45, 45, 70, 2500, updateClientPeriod),
+		width:              widthX,
+		height:             widthY,
+		updateClientPeriod: updateClientPeriod,
 	}
 }
 
@@ -98,22 +101,20 @@ func (g *Game) CreateCookie(sessionID uint64, req *messages.CreateCookieRequest)
 	return messages.NewCreateCookieResponse(sessionID, score, float32(x), float32(y)), nil
 }
 
-func (g *Game) ViewPortRequest(sessionID uint64) (*messages.ViewportResponse, error) {
+func (g *Game) UpdateViewportResponse(sessionID uint64) (*messages.ViewportResponse, error) {
 
-	v, err := g.gSessions.GetViewport(sessionID)
+	resp, err := g.gSessions.GetViewportResponse(sessionID)
 	if err != nil {
 		return nil, err
 	}
 
-	cookies, food := g.world.viewPort(v)
-
 	response := messages.ViewportResponse{}
 	response.Type = messages.ViewPortResponseType
 
-	response.Cookies = make([]*messages.CookieInfo, 0, len(cookies))
-	response.Food = make([]*messages.FoodInfo, 0, len(food))
+	response.Cookies = make([]*messages.CookieInfo, 0, len(resp.Cookies))
+	response.Food = make([]*messages.FoodInfo, 0, len(resp.Food))
 
-	for _, cookie := range cookies {
+	for _, cookie := range resp.Cookies {
 		pos := cookie.GetPosition()
 		response.Cookies = append(
 			response.Cookies,
@@ -124,7 +125,7 @@ func (g *Game) ViewPortRequest(sessionID uint64) (*messages.ViewportResponse, er
 				Y:     float32(pos.Y),
 			})
 	}
-	for _, f := range food {
+	for _, f := range resp.Food {
 		pos := f.GetPosition()
 		response.Food = append(
 			response.Food,
@@ -140,7 +141,7 @@ func (g *Game) ViewPortRequest(sessionID uint64) (*messages.ViewportResponse, er
 }
 
 func (g *Game) UpdateViewPortRequest(sessionID uint64, req *messages.ViewPortRequest) {
-	err := g.gSessions.SetViewport(sessionID, req.X, req.Y, req.XX, req.YY, req.Angle, req.Turbo)
+	err := g.gSessions.SetViewportRequest(sessionID, req.X, req.Y, req.XX, req.YY, req.Angle, req.Turbo)
 	if err != nil {
 		fmt.Printf("Error updating viewport <%s>", err)
 	}
