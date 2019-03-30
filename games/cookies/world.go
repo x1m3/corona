@@ -121,6 +121,7 @@ func (w *world) runSimulation(velocityIterations int, positionIterations int) {
 		w.worldMutex.Lock()
 
 		w.B2World.Step(timeStepBox2D, velocityIterations, positionIterations)
+		w.B2World.ClearForces()
 
 		w.removeBodies()
 		w.runFoodTasks()
