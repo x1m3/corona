@@ -3,6 +3,7 @@ package cookies
 import (
 	"fmt"
 	"github.com/ByteArena/box2d"
+	"github.com/x1m3/elixir/games/cookies/messages"
 	"github.com/x1m3/elixir/games/cookies/sessionmanager"
 	"github.com/x1m3/elixir/pkg/list"
 	"log"
@@ -23,6 +24,8 @@ type world struct {
 	width  float64
 	height float64
 
+	updateClientPeriod time.Duration
+
 	minFPS     float64
 	maxFPS     float64
 	currentFPS float64
@@ -38,25 +41,26 @@ type world struct {
 	foodQueue      *list.LIFO
 }
 
-func NewWorld(gs *sessionmanager.Sessions, w, h, minFPS, maxFPS float64, speed, turboSpeed int, minFoodCount uint64) *world {
+func NewWorld(gs *sessionmanager.Sessions, w, h, minFPS, maxFPS float64, speed, turboSpeed int, minFoodCount uint64, updateClientPeriod time.Duration) *world {
 
 	chColl2Cookies := make(chan *collision2CookiesDTO, 1024)
 	chCollCookieFood := make(chan *collissionCookieFoodDTO, 1024)
 
 	world := &world{
-		B2World:       box2d.MakeB2World(box2d.MakeB2Vec2(0, 0)),
-		gSessions:     gs,
-		width:         w,
-		height:        h,
-		minFPS:        minFPS,
-		maxFPS:        maxFPS,
-		currentFPS:    (maxFPS - minFPS) / 2,
-		col2Cookies:   chColl2Cookies,
-		colCookieFood: chCollCookieFood,
-		speed:         speed,
-		turboSpeed:    turboSpeed,
-		minFoodCount:  minFoodCount,
-		foodQueue:     list.NewLIFO(),
+		B2World:            box2d.MakeB2World(box2d.MakeB2Vec2(0, 0)),
+		gSessions:          gs,
+		width:              w,
+		height:             h,
+		updateClientPeriod: updateClientPeriod,
+		minFPS:             minFPS,
+		maxFPS:             maxFPS,
+		currentFPS:         (maxFPS + minFPS) / 2,
+		col2Cookies:        chColl2Cookies,
+		colCookieFood:      chCollCookieFood,
+		speed:              speed,
+		turboSpeed:         turboSpeed,
+		minFoodCount:       minFoodCount,
+		foodQueue:          list.NewLIFO(),
 	}
 	world.B2World.SetContactListener(newContactListener(chColl2Cookies, chCollCookieFood))
 	return world
@@ -121,6 +125,9 @@ func (w *world) runSimulation(velocityIterations int, positionIterations int) {
 		w.worldMutex.Lock()
 
 		w.B2World.Step(timeStepBox2D, velocityIterations, positionIterations)
+		w.B2World.ClearForces()
+
+		w.updateViewportResponses()
 
 		w.removeBodies()
 		w.runFoodTasks()
@@ -179,7 +186,7 @@ func (w *world) adjustSpeedsAndSizes() {
 
 		magnitude := 2 * (expectedSpeed - currentSpeed) * inertia * contactPenalty
 
-		viewport, _ := w.gSessions.GetViewport(sessionID)
+		viewport, _ := w.gSessions.GetViewportRequest(sessionID)
 
 		vector := box2d.MakeB2Vec2(math.Cos(float64(viewport.Angle)), math.Sin(float64(viewport.Angle)))
 
@@ -272,7 +279,7 @@ func (w *world) addFoodToWorld(x, y float64, score uint64, dispersion int) {
 	fd.Restitution = 0
 	fd.Friction = 1
 
-	fd.Filter.GroupIndex= -1 // Food do not collide
+	fd.Filter.GroupIndex = -1 // Food do not collide
 
 	// Create body
 	body := w.B2World.CreateBody(&def)
@@ -338,28 +345,25 @@ func (w *world) listenContactBetweenCookies() {
 
 		score1, score2 := float64(cookie1.Score), float64(cookie2.Score)
 
-
 		var diff, newScore1, newScore2, ratio1, ratio2 float64
 
-		if score1>score2 {
+		if score1 > score2 {
 			ratio1, ratio2 = score2/score1, 1-(score2/score1)
 			diff = math.Min(score1-score2, score2)
 
 		} else {
-			ratio1, ratio2 = 1 - (score1/score2), score1/score2
+			ratio1, ratio2 = 1-(score1/score2), score1/score2
 			diff = math.Min(score2-score1, score1)
 		}
 
-		newScore1 = math.Max(0, score1 - 0.1*score1 - diff * ratio1)
-		newScore2 = math.Max(0, score2 - 0.1*score2 - diff * ratio2)
-
+		newScore1 = math.Max(0, score1-0.1*score1-diff*ratio1)
+		newScore2 = math.Max(0, score2-0.1*score2-diff*ratio2)
 
 		_ = w.gSessions.SetScore(cookie1.ID, uint64(math.Floor(newScore1)))
 		_ = w.gSessions.SetScore(cookie2.ID, uint64(math.Floor(newScore2)))
 
 		// Throw some food
 		w.foodQueue.Push(newThrowFoodTask(int(math.Floor(diff)), (cookie1.body.GetPosition().X+cookie2.body.GetPosition().X)/2, (cookie1.body.GetPosition().Y+cookie2.body.GetPosition().Y)/2))
-
 
 		if newScore1 < 50 {
 			if err := w.gSessions.StopPlaying(cookie1.ID); err != nil {
@@ -410,7 +414,7 @@ func (w *world) listenContactBetweenCookiesAndFood() {
 		}
 
 		err = w.gSessions.IncScore(cookie.ID, food.Score)
-		if err!=nil {
+		if err != nil {
 			log.Printf("Error updating score, <%s>", err)
 		}
 
@@ -437,28 +441,66 @@ func (w *world) getCookieFixtureDefByScore(score uint64) *box2d.B2FixtureDef {
 	return &fd
 }
 
-func (w *world) viewPort(v *sessionmanager.Viewport) ([]*box2d.B2Body, []*box2d.B2Body) {
+func (w *world) updateViewportResponses() {
+	w.gSessions.Each(
+		func(sessionID uint64) bool {
+			if !w.gSessions.ShouldUpdateViewportResponse(sessionID, w.updateClientPeriod) {
+				return true
+			}
+			v, err := w.gSessions.GetViewportRequest(sessionID)
+			if err != nil {
+				return true
+			}
 
-	cookies := make([]*box2d.B2Body, 0)
-	food := make([]*box2d.B2Body, 0)
+			respCh, err := w.gSessions.GetViewportResponseChannel(sessionID)
+			if err != nil {
+				log.Printf("Error updating viewport response. err:<%s>", err)
+			}
 
-	w.worldMutex.RLock()
+			w.gSessions.UpdateLastViewportRequestTime(sessionID)
+			respCh <- w.viewPort(v)
+
+			return true
+		})
+}
+
+func (w *world) viewPort(v *sessionmanager.Viewport) *messages.ViewportResponse {
+
+
+	response := &messages.ViewportResponse{}
+	response.Type = messages.ViewPortResponseType
+
+	response.Cookies = make([]*messages.CookieInfo, 0)
+	response.Food = make([]*messages.FoodInfo, 0)
 
 	w.QueryAABB(
 		func(fixture *box2d.B2Fixture) bool {
 			info := fixture.M_body.GetUserData()
+			pos := fixture.M_body.GetPosition()
 			switch info.(type) {
 			case *Cookie:
-				cookies = append(cookies, fixture.M_body)
+				response.Cookies = append(
+					response.Cookies,
+					&messages.CookieInfo{
+						ID:    info.(*Cookie).ID,
+						Score: info.(*Cookie).Score,
+						X:     float32(pos.X),
+						Y:     float32(pos.Y),
+					})
 			case *Food:
-				food = append(food, fixture.M_body)
+				response.Food = append(
+					response.Food,
+					&messages.FoodInfo{
+						ID:    info.(*Food).ID,
+						Score: info.(*Food).Score,
+						X:     float32(pos.X),
+						Y:     float32(pos.Y),
+					})
 			}
 			return true
 		},
 		box2d.B2AABB{LowerBound: box2d.MakeB2Vec2(float64(v.X), float64(v.Y)), UpperBound: box2d.MakeB2Vec2(float64(v.XX), float64(v.YY))},
 	)
 
-	w.worldMutex.RUnlock()
-
-	return cookies, food
+	return response
 }

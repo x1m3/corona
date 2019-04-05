@@ -1,6 +1,7 @@
 package bots
 
 import (
+	"github.com/pkg/errors"
 	"github.com/x1m3/elixir/games/cookies"
 	"github.com/x1m3/elixir/games/cookies/messages"
 	"log"
@@ -20,6 +21,7 @@ type Bot struct {
 	game   *cookies.Game
 	agent  BotAgent
 	sessionID uint64
+	viewportResponses chan *messages.ViewportResponse
 	ticker *time.Ticker
 	finish chan bool
 }
@@ -35,7 +37,7 @@ func (b *Bot) Run() error {
 	var err error
 
 	// Creating a session
-	b.sessionID = b.game.NewSession()
+	b.sessionID, b.viewportResponses = b.game.NewSession()
 
 	// Joining step1
 	resp, err = b.game.UserJoin(b.sessionID, b.agent.Join())
@@ -55,11 +57,9 @@ func (b *Bot) Run() error {
 
 	for {
 		select {
-		case <-b.ticker.C:
-			resp, err := b.game.ViewPortRequest(b.sessionID)
-			if err != nil {
-				b.destroy()
-				return nil
+		case resp, ok := <-b.viewportResponses:
+			if !ok {
+				return errors.New("bla bla bla")
 			}
 			b.agent.UpdateViewWorld(resp)
 			b.game.UpdateViewPortRequest(b.sessionID, b.agent.Move())

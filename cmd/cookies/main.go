@@ -22,11 +22,10 @@ const (
 	pixels2Meters              = 10
 	gameWidthMeters            = 2000
 	gameHeightMeters           = 2000
-	NumCookies                 = 100
 	virtualHost                = ""
 	port                       = 8000
-	serverHTTPReadTimeOut      = 30 * time.Second // Maximum time to read the full http request
-	serverHTTPWriteTimeout     = 30 * time.Second // Maximum time to write the full http request
+	serverHTTPReadTimeOut      = 10 * time.Second // Maximum time to read the full http request
+	serverHTTPWriteTimeout     = 10 * time.Second // Maximum time to write the full http request
 	serverHTTPKeepAliveTimeout = 5 * time.Second  // Keep alive timeout. Time to close an idle connection if keep alive is enable
 )
 
@@ -34,7 +33,7 @@ var game *cookies.Game
 
 func main() {
 
-	game = cookies.New(gameWidthMeters, gameHeightMeters)
+	game = cookies.New(gameWidthMeters, gameHeightMeters, updateClientPeriod)
 
 	router := &mux.Router{}
 	router.NotFoundHandler = func() http.HandlerFunc {
@@ -59,18 +58,20 @@ func main() {
 	go game.Init()
 	log.Println("Starting Server")
 
-	for i := 0; i < 500; i++ {
-		go func(i int) {
-			bot := bots.New(game, bots.NewDummyBotAgent(100, 100))
-			log.Println("Bot started", i)
-			if err := bot.Run(); err != nil {
-				log.Println(err)
-				bot.Destroy()
-				return
-			}
-
-		}(i)
-	}
+	go func() {
+		for i := 0; i < 500; i++ {
+			time.Sleep(100 * time.Millisecond)
+			go func(i int) {
+				bot := bots.New(game, bots.NewDummyBotAgent(100, 100))
+				log.Println("Bot started", i)
+				if err := bot.Run(); err != nil {
+					log.Println(err)
+					bot.Destroy()
+					return
+				}
+			}(i)
+		}
+	}()
 
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
@@ -117,36 +118,30 @@ func wsAction(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	sessionID := game.NewSession()
+	sessionID, viewportResponses := game.NewSession()
 
 	transport := cookies.NewTransport(json.Codec, cookies.NewWebsocketConnection(conn))
 
 	go handleWSRequests(transport, sessionID)
 
-	go manageRemoteView(transport, sessionID, updateClientPeriod)
+	go manageRemoteView(transport, sessionID, viewportResponses, updateClientPeriod)
 
 	log.Println("New Connection")
 }
 
-func manageRemoteView(transport *cookies.Transport, sessionID uint64, updatePeriod time.Duration) {
-
-	ticker := time.NewTicker(updatePeriod)
-	defer ticker.Stop()
-
+func manageRemoteView(transport *cookies.Transport, sessionID uint64, viewportResponses chan *messages.ViewportResponse, updatePeriod time.Duration) {
 	for {
-		<-ticker.C
-		req, err := game.ViewPortRequest(sessionID)
-		if err != nil {
-			// Do nothing. Probably, game is not in playing state
-			continue
-		}
-
-		err = transport.Send(req)
-		if err != nil {
-			log.Printf("Socket broken while writing. Closing connection. Err:<%v>", err)
-			game.Logout(sessionID)
-			transport.Close()
-			return
+		select {
+		case req, ok := <-viewportResponses:
+			if !ok {
+				return
+			}
+			if err := transport.Send(req); err!=nil {
+				log.Printf("Socket broken while writing. Closing connection. Err:<%v>", err)
+				game.Logout(sessionID)
+				transport.Close()
+				return
+			}
 		}
 	}
 }
