@@ -3,6 +3,7 @@ package cookies
 import (
 	"fmt"
 	"github.com/ByteArena/box2d"
+	"github.com/x1m3/elixir/games/cookies/messages"
 	"github.com/x1m3/elixir/games/cookies/sessionmanager"
 	"github.com/x1m3/elixir/pkg/list"
 	"log"
@@ -450,31 +451,56 @@ func (w *world) updateViewportResponses() {
 			if err != nil {
 				return true
 			}
-			_ = w.gSessions.SetViewportResponse(sessionID, w.viewPort(v))
+
+			respCh, err := w.gSessions.GetViewportResponseChannel(sessionID)
+			if err != nil {
+				log.Printf("Error updating viewport response. err:<%s>", err)
+			}
+
+			w.gSessions.UpdateLastViewportRequestTime(sessionID)
+			respCh <- w.viewPort(v)
+
 			return true
 		})
 }
 
-func (w *world) viewPort(v *sessionmanager.Viewport) *sessionmanager.ViewPortResponse {
+func (w *world) viewPort(v *sessionmanager.Viewport) *messages.ViewportResponse {
 
-	resp := &sessionmanager.ViewPortResponse{
-		Cookies: make([]*box2d.B2Body, 0),
-		Food:    make([]*box2d.B2Body, 0),
-	}
+
+	response := &messages.ViewportResponse{}
+	response.Type = messages.ViewPortResponseType
+
+	response.Cookies = make([]*messages.CookieInfo, 0)
+	response.Food = make([]*messages.FoodInfo, 0)
 
 	w.QueryAABB(
 		func(fixture *box2d.B2Fixture) bool {
 			info := fixture.M_body.GetUserData()
+			pos := fixture.M_body.GetPosition()
 			switch info.(type) {
 			case *Cookie:
-				resp.Cookies = append(resp.Cookies, fixture.M_body)
+				response.Cookies = append(
+					response.Cookies,
+					&messages.CookieInfo{
+						ID:    info.(*Cookie).ID,
+						Score: info.(*Cookie).Score,
+						X:     float32(pos.X),
+						Y:     float32(pos.Y),
+					})
 			case *Food:
-				resp.Food = append(resp.Food, fixture.M_body)
+				response.Food = append(
+					response.Food,
+					&messages.FoodInfo{
+						ID:    info.(*Food).ID,
+						Score: info.(*Food).Score,
+						X:     float32(pos.X),
+						Y:     float32(pos.Y),
+					})
 			}
 			return true
 		},
 		box2d.B2AABB{LowerBound: box2d.MakeB2Vec2(float64(v.X), float64(v.Y)), UpperBound: box2d.MakeB2Vec2(float64(v.XX), float64(v.YY))},
 	)
 
-	return resp
+	return response
 }

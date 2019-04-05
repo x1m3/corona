@@ -60,7 +60,7 @@ func main() {
 
 	go func() {
 		for i := 0; i < 500; i++ {
-			time.Sleep(1 * time.Second)
+			time.Sleep(100 * time.Millisecond)
 			go func(i int) {
 				bot := bots.New(game, bots.NewDummyBotAgent(100, 100))
 				log.Println("Bot started", i)
@@ -118,34 +118,25 @@ func wsAction(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	sessionID := game.NewSession()
+	sessionID, viewportResponses := game.NewSession()
 
 	transport := cookies.NewTransport(json.Codec, cookies.NewWebsocketConnection(conn))
 
 	go handleWSRequests(transport, sessionID)
 
-	go manageRemoteView(transport, sessionID, updateClientPeriod)
+	go manageRemoteView(transport, sessionID, viewportResponses, updateClientPeriod)
 
 	log.Println("New Connection")
 }
 
-func manageRemoteView(transport *cookies.Transport, sessionID uint64, updatePeriod time.Duration) {
-
-	ticker := time.NewTicker(updatePeriod)
-	defer ticker.Stop()
-
+func manageRemoteView(transport *cookies.Transport, sessionID uint64, viewportResponses chan *messages.ViewportResponse, updatePeriod time.Duration) {
 	for {
-
 		select {
-		case <-ticker.C:
-			req, err := game.UpdateViewportResponse(sessionID)
-			if err != nil {
-				// Do nothing. Probably, game is not in playing state
-				continue
+		case req, ok := <-viewportResponses:
+			if !ok {
+				return
 			}
-
-			err = transport.Send(req)
-			if err != nil {
+			if err := transport.Send(req); err!=nil {
 				log.Printf("Socket broken while writing. Closing connection. Err:<%v>", err)
 				game.Logout(sessionID)
 				transport.Close()

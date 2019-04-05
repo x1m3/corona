@@ -3,22 +3,12 @@ package sessionmanager
 import (
 	"github.com/ByteArena/box2d"
 	"github.com/pkg/errors"
+	"github.com/x1m3/elixir/games/cookies/messages"
 	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
 )
-
-type gameSession struct {
-	ID                          uint64
-	userName                    string
-	score                       uint64
-	state                       state
-	viewportRequest             Viewport
-	lastViewportResponseRequest time.Time
-	viewportResponse            *ViewPortResponse
-	box2dbody                   *box2d.B2Body
-}
 
 type Viewport struct {
 	X     float32
@@ -44,8 +34,25 @@ const WriteMode = 2
 
 type gameSessionFunc func(s *gameSession) (interface{}, error)
 
+type gameSession struct {
+	ID                          uint64
+	userName                    string
+	score                       uint64
+	state                       state
+	viewportRequest             Viewport
+	lastViewportResponseRequest time.Time
+	viewportResponseCh          chan *messages.ViewportResponse
+	box2dbody                   *box2d.B2Body
+}
+
 func newGameSession(id uint64) *gameSession {
-	return &gameSession{ID: id, state: &notLoggedState{}, score: 100, lastViewportResponseRequest: time.Now()}
+	return &gameSession{
+		ID:                          id,
+		state:                       &notLoggedState{},
+		score:                       100,
+		lastViewportResponseRequest: time.Now(),
+		viewportResponseCh:          make(chan *messages.ViewportResponse, 1000),
+	}
 }
 
 func (s *gameSession) getViewportRequest() (*Viewport, error) {
@@ -66,22 +73,6 @@ func (s *gameSession) updateViewportRequest(x, y, xx, yy float32, a float32, t b
 		s.viewportRequest.Angle = a
 		s.viewportRequest.Turbo = t
 	}
-}
-
-func (s *gameSession) updateViewportResponse(v *ViewPortResponse) {
-	s.viewportResponse = v
-}
-
-func (s *gameSession) getViewportResponse() (*ViewPortResponse, error) {
-
-	if !s.state.canSendScreenUpdates() {
-		return nil, errCannotSendScreenUpdates
-	}
-
-	if s.viewportResponse == nil {
-		return nil, errViewportResponseEmpty
-	}
-	return s.viewportResponse, nil
 }
 
 func (s *gameSession) login(username string) error {
@@ -172,6 +163,7 @@ func (s *Sessions) Close(id uint64) error {
 		id,
 		func() gameSessionFunc {
 			return func(session *gameSession) (interface{}, error) {
+				close(s.sessions[id].viewportResponseCh)
 				delete(s.sessions, session.ID)
 				return nil, nil
 			}
@@ -235,20 +227,20 @@ func (s *Sessions) GetViewportRequest(id uint64) (*Viewport, error) {
 	}
 	return v.(*Viewport), err
 }
-func (s *Sessions) GetViewportResponse(id uint64) (*ViewPortResponse, error) {
+
+func (s *Sessions) GetViewportResponseChannel(id uint64) (chan *messages.ViewportResponse, error) {
 	v, err := s.ensure(
 		id,
 		func() gameSessionFunc {
 			return func(session *gameSession) (interface{}, error) {
-				session.lastViewportResponseRequest = time.Now()
-				return session.getViewportResponse()
+				return session.viewportResponseCh, nil
 			}
 		}(),
 		ReadMode)
 	if err != nil {
 		return nil, err
 	}
-	return v.(*ViewPortResponse), err
+	return v.(chan *messages.ViewportResponse), err
 }
 
 func (s *Sessions) IsLogged(id uint64) (bool, error) {
@@ -330,19 +322,6 @@ func (s *Sessions) SetViewportRequest(id uint64, x, y, xx, yy float32, a float32
 	return err
 }
 
-func (s *Sessions) SetViewportResponse(id uint64, v *ViewPortResponse) error {
-	_, err := s.ensure(
-		id,
-		func() gameSessionFunc {
-			return func(session *gameSession) (interface{}, error) {
-				session.updateViewportResponse(v)
-				return nil, nil
-			}
-		}(),
-		WriteMode)
-	return err
-}
-
 func (s *Sessions) SetScore(id uint64, score uint64) error {
 	_, err := s.ensure(
 		id,
@@ -356,12 +335,24 @@ func (s *Sessions) SetScore(id uint64, score uint64) error {
 	return err
 }
 
+func (s *Sessions) UpdateLastViewportRequestTime(id uint64) {
+	_, _ = s.ensure(
+		id,
+		func() gameSessionFunc {
+			return func(session *gameSession) (interface{}, error) {
+				session.lastViewportResponseRequest = time.Now()
+				return true, nil
+			}
+		}(),
+		WriteMode)
+}
+
 func (s *Sessions) ShouldUpdateViewportResponse(id uint64, updatePeriod time.Duration) bool {
 	toUpdate, err := s.ensure(
 		id,
 		func() gameSessionFunc {
 			return func(session *gameSession) (interface{}, error) {
-				if time.Since(session.lastViewportResponseRequest)>time.Duration(0.7 * float64(updatePeriod)) {
+				if time.Since(session.lastViewportResponseRequest) > updatePeriod {
 					return true, nil
 				}
 				return false, nil
@@ -372,7 +363,6 @@ func (s *Sessions) ShouldUpdateViewportResponse(id uint64, updatePeriod time.Dur
 		return false
 	}
 	return toUpdate.(bool)
-
 }
 
 func (s *Sessions) IncScore(id uint64, score uint64) error {

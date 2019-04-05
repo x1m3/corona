@@ -38,8 +38,10 @@ func (g *Game) Init() {
 	go g.world.runSimulation(4, 1)
 }
 
-func (g *Game) NewSession() uint64 {
-	return g.gSessions.Add()
+func (g *Game) NewSession() (uint64, chan *messages.ViewportResponse) {
+	id := g.gSessions.Add()
+	ch, _ := g.gSessions.GetViewportResponseChannel(id)
+	return id, ch
 }
 
 func (g *Game) UserJoin(sessionID uint64, req *messages.UserJoinRequest) (*messages.UserJoinResponse, error) {
@@ -99,45 +101,6 @@ func (g *Game) CreateCookie(sessionID uint64, req *messages.CreateCookieRequest)
 		return nil, err
 	}
 	return messages.NewCreateCookieResponse(sessionID, score, float32(x), float32(y)), nil
-}
-
-func (g *Game) UpdateViewportResponse(sessionID uint64) (*messages.ViewportResponse, error) {
-
-	resp, err := g.gSessions.GetViewportResponse(sessionID)
-	if err != nil {
-		return nil, err
-	}
-
-	response := messages.ViewportResponse{}
-	response.Type = messages.ViewPortResponseType
-
-	response.Cookies = make([]*messages.CookieInfo, 0, len(resp.Cookies))
-	response.Food = make([]*messages.FoodInfo, 0, len(resp.Food))
-
-	for _, cookie := range resp.Cookies {
-		pos := cookie.GetPosition()
-		response.Cookies = append(
-			response.Cookies,
-			&messages.CookieInfo{
-				ID:    cookie.GetUserData().(*Cookie).ID,
-				Score: cookie.GetUserData().(*Cookie).Score,
-				X:     float32(pos.X),
-				Y:     float32(pos.Y),
-			})
-	}
-	for _, f := range resp.Food {
-		pos := f.GetPosition()
-		response.Food = append(
-			response.Food,
-			&messages.FoodInfo{
-				ID:    f.GetUserData().(*Food).ID,
-				Score: f.GetUserData().(*Food).Score,
-				X:     float32(pos.X),
-				Y:     float32(pos.Y),
-			})
-	}
-
-	return &response, nil
 }
 
 func (g *Game) UpdateViewPortRequest(sessionID uint64, req *messages.ViewPortRequest) {
