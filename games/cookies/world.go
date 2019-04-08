@@ -127,11 +127,11 @@ func (w *world) runSimulation(velocityIterations int, positionIterations int) {
 		w.B2World.Step(timeStepBox2D, velocityIterations, positionIterations)
 		w.B2World.ClearForces()
 
-		w.updateViewportResponses()
-
 		w.removeBodies()
 		w.runFoodTasks()
 		w.adjustSpeedsAndSizes()
+
+		w.updateViewportResponses()
 
 		w.worldMutex.Unlock()
 
@@ -225,9 +225,8 @@ func (w *world) removeCookie(body *box2d.B2Body) {
 
 func (w *world) runFoodTasks() {
 
-	for i := 0; i < 5; i++ {
+	for  {
 		o := w.foodQueue.Pop()
-
 		if o == nil {
 			return
 		}
@@ -442,7 +441,7 @@ func (w *world) getCookieFixtureDefByScore(score uint64) *box2d.B2FixtureDef {
 }
 
 func (w *world) updateViewportResponses() {
-	w.gSessions.Each(
+	w.gSessions.EachParallel(
 		func(sessionID uint64) bool {
 			if !w.gSessions.ShouldUpdateViewportResponse(sessionID, w.updateClientPeriod) {
 				return true

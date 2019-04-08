@@ -405,15 +405,36 @@ func (s *Sessions) session(id uint64) *gameSession {
 func (s *Sessions) Each(fn func(id uint64) bool) {
 
 	s.Lock()
-	sessions := make([]*gameSession, 0, len(s.sessions))
-	for _, session := range s.sessions {
-		sessions = append(sessions, session)
+	sessionIDs := make([]uint64, 0, len(s.sessions))
+	for id := range s.sessions {
+		sessionIDs = append(sessionIDs, id)
 	}
 	s.Unlock()
 
-	for _, session := range sessions {
-		if !fn(session.ID) {
+	for _, sessionID := range sessionIDs {
+		if !fn(sessionID) {
 			return
 		}
 	}
+}
+
+
+func (s *Sessions) EachParallel(fn func(id uint64) bool) {
+
+	s.Lock()
+	sessionIDs := make([]uint64, 0, len(s.sessions))
+	for id := range s.sessions {
+		sessionIDs = append(sessionIDs, id)
+	}
+	s.Unlock()
+
+	wg :=sync.WaitGroup{}
+	for _, sessionID := range sessionIDs {
+		wg.Add(1)
+		go func(sessionID uint64) {
+			fn(sessionID)
+			wg.Done()
+		}(sessionID)
+	}
+	wg.Wait()
 }

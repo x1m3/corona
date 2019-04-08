@@ -59,7 +59,7 @@ func main() {
 	log.Println("Starting Server")
 
 	go func() {
-		for i := 0; i < 500; i++ {
+		for i := 0; i < 1000; i++ {
 			time.Sleep(100 * time.Millisecond)
 			go func(i int) {
 				bot := bots.New(game, bots.NewDummyBotAgent(100, 100))
