@@ -243,6 +243,42 @@ func (s *Sessions) GetViewportResponseChannel(id uint64) (chan *messages.Viewpor
 	return v.(chan *messages.ViewportResponse), err
 }
 
+// GetViewportRequestEnhanced is a spagheti code version optimized for speed
+// that does the same as calling all of this:
+// ShouldUpdateViewportResponse(),
+// GetViewportRequest()
+// GetViewportResponseChannel()
+// UpdateLastViewportRequestTime()
+//
+// Thanks to this speed optimization we avoid transversing sessions map 4 times and we
+// only lock the sessions system once,
+func (s *Sessions) GetViewportRequestEnhanced(id uint64, updatePeriod time.Duration) (needsUpdate bool, v *Viewport, ch chan *messages.ViewportResponse, err error) {
+	s.Lock()
+
+	session, found := s.sessions[id]
+	if !found {
+		s.Unlock()
+		return false, nil, nil, errSessionNotFound
+	}
+
+	if time.Since(session.lastViewportResponseRequest) < updatePeriod {
+		s.Unlock()
+		return false, nil, nil, nil
+	}
+
+	v, err  = session.getViewportRequest()
+	if err!=nil {
+		s.Unlock()
+		return false, v, nil, err
+	}
+
+	session.lastViewportResponseRequest = time.Now()
+
+	s.Unlock()
+	return true, v, session.viewportResponseCh, nil
+}
+
+
 func (s *Sessions) IsLogged(id uint64) (bool, error) {
 	logged, err := s.ensure(
 		id,
@@ -419,7 +455,7 @@ func (s *Sessions) Each(fn func(id uint64) bool) {
 }
 
 
-func (s *Sessions) EachParallel(fn func(id uint64) bool) {
+func (s *Sessions) EachParallel(fn func(id uint64)) {
 
 	s.Lock()
 	sessionIDs := make([]uint64, 0, len(s.sessions))

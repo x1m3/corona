@@ -225,7 +225,7 @@ func (w *world) removeCookie(body *box2d.B2Body) {
 
 func (w *world) runFoodTasks() {
 
-	for  {
+	for {
 		o := w.foodQueue.Pop()
 		if o == nil {
 			return
@@ -442,13 +442,14 @@ func (w *world) getCookieFixtureDefByScore(score uint64) *box2d.B2FixtureDef {
 
 func (w *world) updateViewportResponses() {
 	w.gSessions.EachParallel(
-		func(sessionID uint64) bool {
+		func(sessionID uint64) {
+			/*
 			if !w.gSessions.ShouldUpdateViewportResponse(sessionID, w.updateClientPeriod) {
-				return true
+				return
 			}
 			v, err := w.gSessions.GetViewportRequest(sessionID)
 			if err != nil {
-				return true
+				return
 			}
 
 			respCh, err := w.gSessions.GetViewportResponseChannel(sessionID)
@@ -457,14 +458,21 @@ func (w *world) updateViewportResponses() {
 			}
 
 			w.gSessions.UpdateLastViewportRequestTime(sessionID)
+
+
 			respCh <- w.viewPort(v)
 
-			return true
+			*/
+
+			needsUpdate, v, respCh, err := w.gSessions.GetViewportRequestEnhanced(sessionID, w.updateClientPeriod)
+			if !needsUpdate || err != nil {
+				return
+			}
+			respCh <- w.viewPort(v)
 		})
 }
 
 func (w *world) viewPort(v *sessionmanager.Viewport) *messages.ViewportResponse {
-
 
 	response := &messages.ViewportResponse{}
 	response.Type = messages.ViewPortResponseType
