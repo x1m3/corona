@@ -118,18 +118,18 @@ func wsAction(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	sessionID, viewportResponses := game.NewSession()
+	sessionID, viewportResponses, endOfGame := game.NewSession()
 
 	transport := cookies.NewTransport(json.Codec, cookies.NewWebsocketConnection(conn))
 
 	go handleWSRequests(transport, sessionID)
 
-	go manageRemoteView(transport, sessionID, viewportResponses, updateClientPeriod)
+	go manageRemoteView(transport, sessionID, viewportResponses, endOfGame, updateClientPeriod)
 
 	log.Println("New Connection")
 }
 
-func manageRemoteView(transport *cookies.Transport, sessionID uint64, viewportResponses chan *messages.ViewportResponse, updatePeriod time.Duration) {
+func manageRemoteView(transport *cookies.Transport, sessionID uint64, viewportResponses chan *messages.ViewportResponse, endOfGame chan interface{}, updatePeriod time.Duration) {
 	for {
 		select {
 		case req, ok := <-viewportResponses:
@@ -142,6 +142,11 @@ func manageRemoteView(transport *cookies.Transport, sessionID uint64, viewportRe
 				transport.Close()
 				return
 			}
+		case _, ok := <-endOfGame:
+			if !ok {
+				return
+			}
+			// TODO: Inform client that game as ended
 		}
 	}
 }

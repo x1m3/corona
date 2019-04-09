@@ -42,6 +42,7 @@ type gameSession struct {
 	viewportRequest             Viewport
 	lastViewportResponseRequest time.Time
 	viewportResponseCh          chan *messages.ViewportResponse
+	endOfGameCh                 chan interface{}
 	box2dbody                   *box2d.B2Body
 }
 
@@ -51,7 +52,8 @@ func newGameSession(id uint64) *gameSession {
 		state:                       &notLoggedState{},
 		score:                       100,
 		lastViewportResponseRequest: time.Now(),
-		viewportResponseCh:          make(chan *messages.ViewportResponse, 1000),
+		viewportResponseCh:          make(chan *messages.ViewportResponse, 1024),
+		endOfGameCh:                 make(chan interface{}, 1024), // we do not want to block
 	}
 }
 
@@ -164,6 +166,8 @@ func (s *Sessions) Close(id uint64) error {
 		func() gameSessionFunc {
 			return func(session *gameSession) (interface{}, error) {
 				close(s.sessions[id].viewportResponseCh)
+				s.sessions[id].endOfGameCh <- true
+				close(s.sessions[id].endOfGameCh)
 				delete(s.sessions, session.ID)
 				return nil, nil
 			}
@@ -243,6 +247,21 @@ func (s *Sessions) GetViewportResponseChannel(id uint64) (chan *messages.Viewpor
 	return v.(chan *messages.ViewportResponse), err
 }
 
+func (s *Sessions) GetEndOfGameChannel(id uint64) (chan interface{}, error) {
+	v, err := s.ensure(
+		id,
+		func() gameSessionFunc {
+			return func(session *gameSession) (interface{}, error) {
+				return session.endOfGameCh, nil
+			}
+		}(),
+		ReadMode)
+	if err != nil {
+		return nil, err
+	}
+	return v.(chan interface{}), err
+}
+
 // GetViewportRequestEnhanced is a spagheti code version optimized for speed
 // that does the same as calling all of this:
 // ShouldUpdateViewportResponse(),
@@ -266,8 +285,8 @@ func (s *Sessions) GetViewportRequestEnhanced(id uint64, updatePeriod time.Durat
 		return false, nil, nil, nil
 	}
 
-	v, err  = session.getViewportRequest()
-	if err!=nil {
+	v, err = session.getViewportRequest()
+	if err != nil {
 		s.Unlock()
 		return false, v, nil, err
 	}
@@ -277,7 +296,6 @@ func (s *Sessions) GetViewportRequestEnhanced(id uint64, updatePeriod time.Durat
 	s.Unlock()
 	return true, v, session.viewportResponseCh, nil
 }
-
 
 func (s *Sessions) IsLogged(id uint64) (bool, error) {
 	logged, err := s.ensure(
@@ -325,6 +343,7 @@ func (s *Sessions) StopPlaying(id uint64) error {
 		id,
 		func() gameSessionFunc {
 			return func(session *gameSession) (interface{}, error) {
+				session.endOfGameCh <- true
 				return nil, session.stopPlaying()
 			}
 		}(),
@@ -454,7 +473,6 @@ func (s *Sessions) Each(fn func(id uint64) bool) {
 	}
 }
 
-
 func (s *Sessions) EachParallel(fn func(id uint64)) {
 
 	s.Lock()
@@ -464,7 +482,7 @@ func (s *Sessions) EachParallel(fn func(id uint64)) {
 	}
 	s.Unlock()
 
-	wg :=sync.WaitGroup{}
+	wg := sync.WaitGroup{}
 	for _, sessionID := range sessionIDs {
 		wg.Add(1)
 		go func(sessionID uint64) {

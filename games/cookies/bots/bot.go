@@ -18,16 +18,16 @@ type BotAgent interface {
 }
 
 type Bot struct {
-	game   *cookies.Game
-	agent  BotAgent
-	sessionID uint64
+	game              *cookies.Game
+	agent             BotAgent
+	sessionID         uint64
 	viewportResponses chan *messages.ViewportResponse
-	ticker *time.Ticker
-	finish chan bool
+	ticker            *time.Ticker
+	endOfGame         chan interface{}
 }
 
 func New(game *cookies.Game, bot BotAgent) *Bot {
-	return &Bot{game: game, agent: bot, ticker: time.NewTicker(250 * time.Millisecond), finish: make(chan bool, 1)}
+	return &Bot{game: game, agent: bot, ticker: time.NewTicker(250 * time.Millisecond)}
 }
 
 // Run makes a bot to connect to the game and start playing. It should be
@@ -37,7 +37,8 @@ func (b *Bot) Run() error {
 	var err error
 
 	// Creating a session
-	b.sessionID, b.viewportResponses = b.game.NewSession()
+	b.sessionID, b.viewportResponses, b.endOfGame = b.game.NewSession()
+
 
 	// Joining step1
 	resp, err = b.game.UserJoin(b.sessionID, b.agent.Join())
@@ -64,7 +65,7 @@ func (b *Bot) Run() error {
 			b.agent.UpdateViewWorld(resp)
 			b.game.UpdateViewPortRequest(b.sessionID, b.agent.Move())
 
-		case <-b.finish:
+		case <-b.endOfGame:
 			b.destroy()
 			return nil
 		}
@@ -78,5 +79,5 @@ func (b *Bot) destroy() {
 }
 
 func (b *Bot) Destroy() {
-	b.finish <- true
+	b.endOfGame <- true
 }
