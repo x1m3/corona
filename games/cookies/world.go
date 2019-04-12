@@ -112,10 +112,10 @@ func (w *world) runSimulation(velocityIterations int, positionIterations int) {
 		}
 	}()
 
-	statsCounter := time.NewTicker(5 * time.Second)
+	statsTicker := time.NewTicker(5 * time.Second)
 	go func() {
 		for {
-			<-statsCounter.C
+			<-statsTicker.C
 			stats := messages.NewStatsResponse(w.foodCount, w.gSessions.Count())
 			w.broadcast(stats)
 		}

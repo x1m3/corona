@@ -58,20 +58,8 @@ func main() {
 	go game.Init()
 	log.Println("Starting Server")
 
-	go func() {
-		for i := 0; i < 1000; i++ {
-			time.Sleep(100 * time.Millisecond)
-			go func(i int) {
-				bot := bots.New(game, bots.NewDummyBotAgent(100, 100))
-				log.Println("Bot started", i)
-				if err := bot.Run(); err != nil {
-					log.Println(err)
-					bot.Destroy()
-					return
-				}
-			}(i)
-		}
-	}()
+	botsManager := bots.NewBotsManager(game)
+	go botsManager.Init()
 
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
