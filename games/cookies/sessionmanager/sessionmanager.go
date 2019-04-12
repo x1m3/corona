@@ -272,28 +272,28 @@ func (s *Sessions) GetEndOfGameChannel(id uint64) (chan interface{}, error) {
 // Thanks to this speed optimization we avoid transversing sessions map 4 times and we
 // only lock the sessions system once,
 func (s *Sessions) GetViewportRequestEnhanced(id uint64, updatePeriod time.Duration) (needsUpdate bool, v *Viewport, ch chan *messages.ViewportResponse, err error) {
-	s.Lock()
+	s.RLock()
 
 	session, found := s.sessions[id]
 	if !found {
-		s.Unlock()
+		s.RUnlock()
 		return false, nil, nil, errSessionNotFound
 	}
 
 	if time.Since(session.lastViewportResponseRequest) < updatePeriod {
-		s.Unlock()
+		s.RUnlock()
 		return false, nil, nil, nil
 	}
 
 	v, err = session.getViewportRequest()
 	if err != nil {
-		s.Unlock()
+		s.RUnlock()
 		return false, v, nil, err
 	}
 
 	session.lastViewportResponseRequest = time.Now()
 
-	s.Unlock()
+	s.RUnlock()
 	return true, v, session.viewportResponseCh, nil
 }
 

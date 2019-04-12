@@ -37,8 +37,8 @@ type world struct {
 	turboSpeed     int
 	minFoodCount   uint64
 	foodCount      uint64
-	bodies2Destroy sync.Map // TODO: Refactor with something more performance. or not...
-	foodQueue      *list.LIFO
+	bodies2Destroy list.LIFO
+	foodQueue      list.LIFO
 }
 
 func NewWorld(gs *sessionmanager.Sessions, w, h, minFPS, maxFPS float64, speed, turboSpeed int, minFoodCount uint64, updateClientPeriod time.Duration) *world {
@@ -60,7 +60,6 @@ func NewWorld(gs *sessionmanager.Sessions, w, h, minFPS, maxFPS float64, speed, 
 		speed:              speed,
 		turboSpeed:         turboSpeed,
 		minFoodCount:       minFoodCount,
-		foodQueue:          list.NewLIFO(),
 	}
 	world.B2World.SetContactListener(newContactListener(chColl2Cookies, chCollCookieFood))
 	return world
@@ -110,16 +109,16 @@ func (w *world) runSimulation(velocityIterations int, positionIterations int) {
 	go func() {
 		for {
 			<-foodTicker.C
-			w.worldMutex.Lock()
 			w.adjustFood()
-			w.worldMutex.Unlock()
 		}
 	}()
 
 	go w.listenContactBetweenCookies()
 	go w.listenContactBetweenCookiesAndFood()
 
+	i := 0
 	for {
+		i++
 		t1 := time.Now()
 
 		w.worldMutex.Lock()
@@ -128,10 +127,15 @@ func (w *world) runSimulation(velocityIterations int, positionIterations int) {
 		w.B2World.ClearForces()
 
 		w.removeBodies()
-		w.runFoodTasks()
-		w.adjustSpeedsAndSizes()
+		if i%7 == 0 {
+			w.runFoodTasks()
+		}
+		if i%5== 0 {
+			w.adjustSpeedsAndSizes()
+		}
 
 		w.updateViewportResponses()
+
 
 		w.worldMutex.Unlock()
 
@@ -208,20 +212,22 @@ func (w *world) adjustSpeedsAndSizes() {
 }
 
 func (w *world) removeBodies() {
-	w.bodies2Destroy.Range(func(id interface{}, body interface{}) bool {
-		body.(*box2d.B2Body).SetActive(false)
-		w.B2World.DestroyBody(body.(*box2d.B2Body))
-		w.bodies2Destroy.Delete(id)
-		return true
-	})
+	for {
+		o := w.bodies2Destroy.Pop()
+		if o == nil {
+			return
+		}
+		body := o.(*box2d.B2Body)
+		body.SetActive(false)
+		w.B2World.DestroyBody(body)
+	}
 }
 
+
 func (w *world) removeCookie(body *box2d.B2Body) {
-	w.worldMutex.Lock()
-	body.SetActive(false)
-	w.B2World.DestroyBody(body)
-	w.worldMutex.Unlock()
+	w.bodies2Destroy.Push(body)
 }
+
 
 func (w *world) runFoodTasks() {
 
@@ -231,7 +237,7 @@ func (w *world) runFoodTasks() {
 			return
 		}
 
-		task := o.(*throwFoodTask)
+		task := o.(throwFoodTask)
 
 		for i := 0; i < task.count; i ++ {
 			w.addFoodToWorld(task.x, task.y, 1, rand.Intn(100000))
@@ -249,9 +255,8 @@ func (w *world) adjustFood() {
 	if foodCount < w.minFoodCount {
 		log.Println("ajustando", foodCount, w.minFoodCount)
 		for i := 0; i < N; i++ {
-			w.addFoodToWorld(float64(30+rand.Intn(int(w.width-30))), float64(30+rand.Intn(int(w.width-30))), uint64(1+rand.Intn(3)), 1000)
+			w.foodQueue.Push(throwFoodTask{count: 1, x: float64(30+rand.Intn(int(w.width-30))), y:float64(30+rand.Intn(int(w.width-30)))})
 		}
-		atomic.AddUint64(&w.foodCount, N)
 	}
 }
 
@@ -362,13 +367,14 @@ func (w *world) listenContactBetweenCookies() {
 		_ = w.gSessions.SetScore(cookie2.ID, uint64(math.Floor(newScore2)))
 
 		// Throw some food
-		w.foodQueue.Push(newThrowFoodTask(int(math.Floor(diff)), (cookie1.body.GetPosition().X+cookie2.body.GetPosition().X)/2, (cookie1.body.GetPosition().Y+cookie2.body.GetPosition().Y)/2))
+		w.foodQueue.Push(throwFoodTask{count: int(math.Floor(diff)), x: (cookie1.body.GetPosition().X + cookie2.body.GetPosition().X) / 2, y: (cookie1.body.GetPosition().Y + cookie2.body.GetPosition().Y) / 2})
 
 		if newScore1 < 50 {
 			if err := w.gSessions.StopPlaying(cookie1.ID); err != nil {
 				log.Println(err)
 			}
-			w.bodies2Destroy.Store(cookie1.ID, cookie1.body)
+
+			w.bodies2Destroy.Push(cookie1.body)
 
 			// TODO: Notify explotion
 			continue
@@ -377,7 +383,7 @@ func (w *world) listenContactBetweenCookies() {
 			if err := w.gSessions.StopPlaying(cookie2.ID); err != nil {
 				log.Println(err)
 			}
-			w.bodies2Destroy.Store(cookie2.ID, cookie2.body)
+			w.bodies2Destroy.Push(cookie2.body)
 
 			// TODO: Notify explotion
 			continue
@@ -420,7 +426,7 @@ func (w *world) listenContactBetweenCookiesAndFood() {
 		atomic.AddUint64(&w.foodCount, ^uint64(0)) // Decrement 1 :-)
 
 		// adding body to the to be destroyed list.
-		w.bodies2Destroy.Store(food.ID, food.body)
+		w.bodies2Destroy.Push(food.body)
 	}
 }
 
