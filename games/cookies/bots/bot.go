@@ -18,12 +18,12 @@ type BotAgent interface {
 }
 
 type Bot struct {
-	game              *cookies.Game
-	agent             BotAgent
-	sessionID         uint64
-	viewportResponses chan *messages.ViewportResponse
-	ticker            *time.Ticker
-	endOfGame         chan interface{}
+	game      *cookies.Game
+	agent     BotAgent
+	sessionID uint64
+	responses chan interface{}
+	ticker    *time.Ticker
+	endOfGame chan interface{}
 }
 
 func New(game *cookies.Game, bot BotAgent) *Bot {
@@ -37,8 +37,7 @@ func (b *Bot) Run() error {
 	var err error
 
 	// Creating a session
-	b.sessionID, b.viewportResponses, b.endOfGame = b.game.NewSession()
-
+	b.sessionID, b.responses, b.endOfGame= b.game.NewSession()
 
 	// Joining step1
 	resp, err = b.game.UserJoin(b.sessionID, b.agent.Join())
@@ -58,12 +57,14 @@ func (b *Bot) Run() error {
 
 	for {
 		select {
-		case resp, ok := <-b.viewportResponses:
+		case resp, ok := <-b.responses:
 			if !ok {
 				return errors.New("bla bla bla")
 			}
-			b.agent.UpdateViewWorld(resp)
-			b.game.UpdateViewPortRequest(b.sessionID, b.agent.Move())
+			if v, ok := resp.(*messages.ViewportResponse); ok {
+				b.agent.UpdateViewWorld(v)
+				b.game.UpdateViewPortRequest(b.sessionID, b.agent.Move())
+			}
 
 		case <-b.endOfGame:
 			b.destroy()

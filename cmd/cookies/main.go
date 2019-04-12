@@ -118,25 +118,25 @@ func wsAction(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	sessionID, viewportResponses, endOfGame := game.NewSession()
+	sessionID, responses, endOfGame := game.NewSession()
 
 	transport := cookies.NewTransport(json.Codec, cookies.NewWebsocketConnection(conn))
 
 	go handleWSRequests(transport, sessionID)
 
-	go manageRemoteView(transport, sessionID, viewportResponses, endOfGame, updateClientPeriod)
+	go manageRemoteView(transport, sessionID, responses, endOfGame)
 
 	log.Println("New Connection")
 }
 
-func manageRemoteView(transport *cookies.Transport, sessionID uint64, viewportResponses chan *messages.ViewportResponse, endOfGame chan interface{}, updatePeriod time.Duration) {
+func manageRemoteView(transport *cookies.Transport, sessionID uint64, responses chan interface{}, endOfGame chan interface{}) {
 	for {
 		select {
-		case req, ok := <-viewportResponses:
+		case req, ok := <-responses:
 			if !ok {
 				return
 			}
-			if err := transport.Send(req); err!=nil {
+			if err := transport.Send(req.(messages.Message)); err != nil {
 				log.Printf("Socket broken while writing. Closing connection. Err:<%v>", err)
 				game.Logout(sessionID)
 				transport.Close()
@@ -146,7 +146,6 @@ func manageRemoteView(transport *cookies.Transport, sessionID uint64, viewportRe
 			if !ok {
 				return
 			}
-			// TODO: Inform client that game as ended
 		}
 	}
 }

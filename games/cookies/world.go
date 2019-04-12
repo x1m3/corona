@@ -17,7 +17,6 @@ import (
 type world struct {
 	worldMutex sync.RWMutex
 
-	// TODO: Ideally, world shouldn't know nothing about sessions. We should break this dependency with events or other mechanism.
 	gSessions *sessionmanager.Sessions
 
 	box2d.B2World
@@ -113,6 +112,15 @@ func (w *world) runSimulation(velocityIterations int, positionIterations int) {
 		}
 	}()
 
+	statsCounter := time.NewTicker(5 * time.Second)
+	go func() {
+		for {
+			<-statsCounter.C
+			stats := messages.NewStatsResponse(w.foodCount, w.gSessions.Count())
+			w.broadcast(stats)
+		}
+	}()
+
 	go w.listenContactBetweenCookies()
 	go w.listenContactBetweenCookiesAndFood()
 
@@ -130,12 +138,11 @@ func (w *world) runSimulation(velocityIterations int, positionIterations int) {
 		if i%7 == 0 {
 			w.runFoodTasks()
 		}
-		if i%5== 0 {
+		if i%5 == 0 {
 			w.adjustSpeedsAndSizes()
 		}
 
 		w.updateViewportResponses()
-
 
 		w.worldMutex.Unlock()
 
@@ -223,11 +230,9 @@ func (w *world) removeBodies() {
 	}
 }
 
-
 func (w *world) removeCookie(body *box2d.B2Body) {
 	w.bodies2Destroy.Push(body)
 }
-
 
 func (w *world) runFoodTasks() {
 
@@ -255,7 +260,7 @@ func (w *world) adjustFood() {
 	if foodCount < w.minFoodCount {
 		log.Println("ajustando", foodCount, w.minFoodCount)
 		for i := 0; i < N; i++ {
-			w.foodQueue.Push(throwFoodTask{count: 1, x: float64(30+rand.Intn(int(w.width-30))), y:float64(30+rand.Intn(int(w.width-30)))})
+			w.foodQueue.Push(throwFoodTask{count: 1, x: float64(30 + rand.Intn(int(w.width-30))), y: float64(30 + rand.Intn(int(w.width-30)))})
 		}
 	}
 }
@@ -449,27 +454,6 @@ func (w *world) getCookieFixtureDefByScore(score uint64) *box2d.B2FixtureDef {
 func (w *world) updateViewportResponses() {
 	w.gSessions.EachParallel(
 		func(sessionID uint64) {
-			/*
-			if !w.gSessions.ShouldUpdateViewportResponse(sessionID, w.updateClientPeriod) {
-				return
-			}
-			v, err := w.gSessions.GetViewportRequest(sessionID)
-			if err != nil {
-				return
-			}
-
-			respCh, err := w.gSessions.GetViewportResponseChannel(sessionID)
-			if err != nil {
-				log.Printf("Error updating viewport response. err:<%s>", err)
-			}
-
-			w.gSessions.UpdateLastViewportRequestTime(sessionID)
-
-
-			respCh <- w.viewPort(v)
-
-			*/
-
 			needsUpdate, v, respCh, err := w.gSessions.GetViewportRequestEnhanced(sessionID, w.updateClientPeriod)
 			if !needsUpdate || err != nil {
 				return
@@ -516,4 +500,14 @@ func (w *world) viewPort(v *sessionmanager.Viewport) *messages.ViewportResponse 
 	)
 
 	return response
+}
+
+func (w *world) broadcast(message interface{}) {
+	w.gSessions.EachParallel(func(id uint64) {
+		ch, err := w.gSessions.GetResponseChannel(id)
+		if err != nil {
+			return
+		}
+		ch <- message
+	})
 }

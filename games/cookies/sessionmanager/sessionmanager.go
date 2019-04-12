@@ -3,7 +3,6 @@ package sessionmanager
 import (
 	"github.com/ByteArena/box2d"
 	"github.com/pkg/errors"
-	"github.com/x1m3/elixir/games/cookies/messages"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -41,7 +40,7 @@ type gameSession struct {
 	state                       state
 	viewportRequest             Viewport
 	lastViewportResponseRequest time.Time
-	viewportResponseCh          chan *messages.ViewportResponse
+	responseCh                  chan interface{}
 	endOfGameCh                 chan interface{}
 	box2dbody                   *box2d.B2Body
 }
@@ -52,8 +51,8 @@ func newGameSession(id uint64) *gameSession {
 		state:                       &notLoggedState{},
 		score:                       100,
 		lastViewportResponseRequest: time.Now(),
-		viewportResponseCh:          make(chan *messages.ViewportResponse, 1024),
-		endOfGameCh:                 make(chan interface{}, 1024), // we do not want to block
+		responseCh:                  make(chan interface{}, 1024),
+		endOfGameCh:                 make(chan interface{}, 256), // we do not want to block
 	}
 }
 
@@ -165,7 +164,7 @@ func (s *Sessions) Close(id uint64) error {
 		id,
 		func() gameSessionFunc {
 			return func(session *gameSession) (interface{}, error) {
-				close(s.sessions[id].viewportResponseCh)
+				close(s.sessions[id].responseCh)
 				s.sessions[id].endOfGameCh <- true
 				close(s.sessions[id].endOfGameCh)
 				delete(s.sessions, session.ID)
@@ -175,6 +174,13 @@ func (s *Sessions) Close(id uint64) error {
 		WriteMode)
 
 	return err
+}
+
+func (s *Sessions) Count() uint64 {
+	s.RLock()
+	c := len(s.sessions)
+	s.RUnlock()
+	return uint64(c)
 }
 
 func (s *Sessions) Login(id uint64, username string) error {
@@ -232,19 +238,19 @@ func (s *Sessions) GetViewportRequest(id uint64) (*Viewport, error) {
 	return v.(*Viewport), err
 }
 
-func (s *Sessions) GetViewportResponseChannel(id uint64) (chan *messages.ViewportResponse, error) {
+func (s *Sessions) GetResponseChannel(id uint64) (chan interface{}, error) {
 	v, err := s.ensure(
 		id,
 		func() gameSessionFunc {
 			return func(session *gameSession) (interface{}, error) {
-				return session.viewportResponseCh, nil
+				return session.responseCh, nil
 			}
 		}(),
 		ReadMode)
 	if err != nil {
 		return nil, err
 	}
-	return v.(chan *messages.ViewportResponse), err
+	return v.(chan interface{}), err
 }
 
 func (s *Sessions) GetEndOfGameChannel(id uint64) (chan interface{}, error) {
@@ -262,6 +268,7 @@ func (s *Sessions) GetEndOfGameChannel(id uint64) (chan interface{}, error) {
 	return v.(chan interface{}), err
 }
 
+
 // GetViewportRequestEnhanced is a spagheti code version optimized for speed
 // that does the same as calling all of this:
 // ShouldUpdateViewportResponse(),
@@ -271,7 +278,7 @@ func (s *Sessions) GetEndOfGameChannel(id uint64) (chan interface{}, error) {
 //
 // Thanks to this speed optimization we avoid transversing sessions map 4 times and we
 // only lock the sessions system once,
-func (s *Sessions) GetViewportRequestEnhanced(id uint64, updatePeriod time.Duration) (needsUpdate bool, v *Viewport, ch chan *messages.ViewportResponse, err error) {
+func (s *Sessions) GetViewportRequestEnhanced(id uint64, updatePeriod time.Duration) (needsUpdate bool, v *Viewport, ch chan interface{}, err error) {
 	s.RLock()
 
 	session, found := s.sessions[id]
@@ -294,7 +301,7 @@ func (s *Sessions) GetViewportRequestEnhanced(id uint64, updatePeriod time.Durat
 	session.lastViewportResponseRequest = time.Now()
 
 	s.RUnlock()
-	return true, v, session.viewportResponseCh, nil
+	return true, v, session.responseCh, nil
 }
 
 func (s *Sessions) IsLogged(id uint64) (bool, error) {

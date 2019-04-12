@@ -38,11 +38,11 @@ func (g *Game) Init() {
 	go g.world.runSimulation(4, 1)
 }
 
-func (g *Game) NewSession() (uint64, chan *messages.ViewportResponse, chan interface{}) {
+func (g *Game) NewSession() (uint64, chan interface{}, chan interface{}) {
 	id := g.gSessions.Add()
-	vCh, _ := g.gSessions.GetViewportResponseChannel(id)
+	respCh, _ := g.gSessions.GetResponseChannel(id)
 	eogCh, _ := g.gSessions.GetEndOfGameChannel(id)
-	return id, vCh, eogCh
+	return id, respCh, eogCh
 }
 
 func (g *Game) UserJoin(sessionID uint64, req *messages.UserJoinRequest) (*messages.UserJoinResponse, error) {

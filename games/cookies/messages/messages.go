@@ -13,6 +13,7 @@ const (
 	UserJoinResponseType     = 4
 	CreateCookieRequestType  = 5
 	CreateCookieResponseType = 6
+	StatsResponseType        = 7
 )
 
 type Message interface {
@@ -56,10 +57,10 @@ type ViewportResponse struct {
 }
 
 type CookieInfo struct {
-	ID              uint64  `json:"ID"`
-	Score           uint64  `json:"SC"`
-	X               float32 `json:"X"`
-	Y               float32 `json:"Y"`
+	ID    uint64  `json:"ID"`
+	Score uint64  `json:"SC"`
+	X     float32 `json:"X"`
+	Y     float32 `json:"Y"`
 }
 
 type FoodInfo struct {
@@ -87,10 +88,10 @@ type CreateCookieResponse struct {
 func NewCreateCookieResponse(ID uint64, sc uint64, X float32, Y float32) *CreateCookieResponse {
 	resp := &CreateCookieResponse{
 		Data: CookieInfo{
-			ID:              ID,
-			Score:           sc,
-			X:               X,
-			Y:               Y,
+			ID:    ID,
+			Score: sc,
+			X:     X,
+			Y:     Y,
 		},
 	}
 	resp.SetType(CreateCookieResponseType)
@@ -121,5 +122,21 @@ type UserJoinResponse struct {
 func NewUserJoinResponse(ok bool, altNames []string) *UserJoinResponse {
 	resp := &UserJoinResponse{Data: userJoinResponseData{Ok: ok, AltNames: altNames}}
 	resp.SetType(UserJoinResponseType)
+	return resp
+}
+
+type StatsResponseData struct {
+	FoodCount    uint64 `json:"FC"`
+	CookiesCount uint64 `json:"CC"`
+}
+
+type StatsResponse struct {
+	BaseMessage
+	Data StatsResponseData
+}
+
+func NewStatsResponse(food uint64, cookies uint64) *StatsResponse {
+	resp := &StatsResponse{Data: StatsResponseData{FoodCount: food, CookiesCount: cookies}}
+	resp.SetType(StatsResponseType)
 	return resp
 }
