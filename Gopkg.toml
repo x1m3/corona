@@ -55,3 +55,7 @@
 [[constraint]]
   branch = "master"
   name = "github.com/x1m3/xevents"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/wangjia184/sortedset"

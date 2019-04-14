@@ -66,6 +66,12 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/wangjia184/sortedset"
+  packages = ["."]
+  revision = "f5d03557ba30bb7487f8e2783957af99d19624e1"
+
+[[projects]]
+  branch = "master"
   name = "github.com/x1m3/priorityQueue"
   packages = ["."]
   revision = "29f82ba34a27a6506f8e043f5093efc71a56a2ca"
@@ -101,6 +107,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "8055285451e89371cbf93b6c7454d13c94ef44397b32bc38b2370503c868c26d"
+  inputs-digest = "43864a30e42631668aaecf9e3852031478880e93b47f45133d057465cc7aa6ea"
   solver-name = "gps-cdcl"
   solver-version = 1
