@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/ByteArena/box2d"
 	"github.com/x1m3/elixir/games/cookies/messages"
+	"github.com/x1m3/elixir/games/cookies/mybox2d"
 	"github.com/x1m3/elixir/games/cookies/sessionmanager"
 	"github.com/x1m3/elixir/pkg/list"
 	"log"
@@ -212,7 +213,7 @@ func (w *world) adjustSpeedsAndSizes() {
 		if score != data.Score {
 			data.Score = score
 			body.DestroyFixture(body.GetFixtureList())
-			body.CreateFixtureFromDef(w.getCookieFixtureDefByScore(score))
+			body.CreateFixtureFromDef(mybox2d.GetCookieFixtureDefByScore(score))
 		}
 		return true
 	})
@@ -322,7 +323,7 @@ func (w *world) addCookieToWorld(x float64, y float64, sessionID uint64, score u
 
 	body := w.B2World.CreateBody(&def)
 
-	body.CreateFixtureFromDef(w.getCookieFixtureDefByScore(score))
+	body.CreateFixtureFromDef(mybox2d.GetCookieFixtureDefByScore(score))
 
 	// Save link to session
 	body.SetUserData(&Cookie{ID: sessionID, Score: score, body: body, lastCookieContact: time.Now().Add(-5 * time.Second)})
@@ -433,22 +434,6 @@ func (w *world) listenContactBetweenCookiesAndFood() {
 		// adding body to the to be destroyed list.
 		w.bodies2Destroy.Push(food.body)
 	}
-}
-
-func (w *world) getCookieFixtureDefByScore(score uint64) *box2d.B2FixtureDef {
-
-	// Shape
-	shape := box2d.MakeB2CircleShape()
-	sc := float64(score)
-	shape.M_radius = (math.Log2(sc) + math.Sqrt(sc)) / 2
-
-	// fixture
-	fd := box2d.MakeB2FixtureDef()
-	fd.Shape = &shape
-	fd.Density = 100 * math.Sqrt(sc)
-	fd.Restitution = 1
-	fd.Friction = 0.1
-	return &fd
 }
 
 func (w *world) updateViewportResponses() {
