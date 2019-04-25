@@ -105,23 +105,8 @@ func (w *world) runSimulation(velocityIterations int, positionIterations int) {
 	timeStepBox2D := float64(timeStep) / float64(time.Second) // Seconds as a float
 	var notime int
 
-	foodTicker := time.NewTicker(2 * time.Second)
-	go func() {
-		for {
-			<-foodTicker.C
-			w.adjustFood()
-		}
-	}()
-
-	statsTicker := time.NewTicker(5 * time.Second)
-	go func() {
-		for {
-			<-statsTicker.C
-			stats := messages.NewStatsResponse(w.foodCount, w.gSessions.Count())
-			w.broadcast(stats)
-		}
-	}()
-
+	go w.adjustFood(2 * time.Second)
+	go w.broadcastStats(5 * time.Second)
 	go w.listenContactBetweenCookies()
 	go w.listenContactBetweenCookiesAndFood()
 
@@ -253,15 +238,28 @@ func (w *world) runFoodTasks() {
 
 }
 
-func (w *world) adjustFood() {
+func (w *world) broadcastStats(d time.Duration) {
+	ticker := time.NewTicker(d)
+	for {
+		<-ticker.C
+		stats := messages.NewStatsResponse(w.foodCount, w.gSessions.Count())
+		w.broadcast(stats)
+	}
+}
+
+func (w *world) adjustFood(d time.Duration) {
 	const N = 500
 
-	foodCount := atomic.LoadUint64(&w.foodCount)
+	ticker := time.NewTicker(d)
+	for {
+		<-ticker.C
+		foodCount := atomic.LoadUint64(&w.foodCount)
 
-	if foodCount < w.minFoodCount {
-		log.Println("ajustando", foodCount, w.minFoodCount)
-		for i := 0; i < N; i++ {
-			w.foodQueue.Push(throwFoodTask{count: 1, x: float64(30 + rand.Intn(int(w.width-30))), y: float64(30 + rand.Intn(int(w.width-30)))})
+		if foodCount < w.minFoodCount {
+			log.Println("ajustando", foodCount, w.minFoodCount)
+			for i := 0; i < N; i++ {
+				w.foodQueue.Push(throwFoodTask{count: 1, x: float64(30 + rand.Intn(int(w.width-30))), y: float64(30 + rand.Intn(int(w.width-30)))})
+			}
 		}
 	}
 }
@@ -279,7 +277,7 @@ func (w *world) addFoodToWorld(x, y float64, score uint64, dispersion int) {
 
 	body.CreateFixtureFromDef(fd)
 
-	body.SetTransform(box2d.MakeB2Vec2(x,y),0)
+	body.SetTransform(box2d.MakeB2Vec2(x, y), 0)
 
 	// Save link to session
 	body.SetUserData(&Food{ID: rand.Uint64() << 8, Score: score, body: body, createdOn: time.Now()})
