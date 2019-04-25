@@ -275,26 +275,15 @@ func (w *world) addFoodToWorld(x, y float64, score uint64, dispersion int) {
 	def.Position.Set(x, y)
 	def.Type = box2d.B2BodyType.B2_dynamicBody
 	def.LinearDamping = 1
-	def.FixedRotation = false
+	def.FixedRotation = true
 	def.AllowSleep = true
 
-	// Shape
-	shape := box2d.MakeB2CircleShape()
-	shape.M_radius = 1
-
-	// fixture
-	fd := box2d.MakeB2FixtureDef()
-	fd.Shape = &shape
-	fd.Density = 1
-	fd.Restitution = 0
-	fd.Friction = 1
-
-	fd.Filter.GroupIndex = -1 // Food do not collide
+	fd := mybox2d.GetFoodFixtureDef()
 
 	// Create body
 	body := w.B2World.CreateBody(&def)
 
-	body.CreateFixtureFromDef(&fd)
+	body.CreateFixtureFromDef(fd)
 
 	// Save link to session
 	body.SetUserData(&Food{ID: rand.Uint64() << 8, Score: score, body: body, createdOn: time.Now()})

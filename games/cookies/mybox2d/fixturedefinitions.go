@@ -5,14 +5,18 @@ import (
 	"math"
 )
 
-var cookieFixtureDefsByScorePool []box2d.B2FixtureDef
 const fixtureDefsByScoreSize = 100000
+
+var cookieFixtureDefsByScorePool []box2d.B2FixtureDef
+var foodFixtureDef *box2d.B2FixtureDef
 
 func init() {
 	cookieFixtureDefsByScorePool = make([]box2d.B2FixtureDef, fixtureDefsByScoreSize)
 	for i:=uint64(0); i<fixtureDefsByScoreSize; i++ {
 		cookieFixtureDefsByScorePool[i] = *newCookieFixtureDefByScore(i)
 	}
+
+	foodFixtureDef = newFoodFixtureDef()
 }
 
 
@@ -35,5 +39,26 @@ func newCookieFixtureDefByScore(score uint64) *box2d.B2FixtureDef {
 	fd.Density = 100 * math.Sqrt(sc)
 	fd.Restitution = 1
 	fd.Friction = 0.1
+	return &fd
+}
+
+func GetFoodFixtureDef() *box2d.B2FixtureDef {
+	return foodFixtureDef
+}
+
+func newFoodFixtureDef() *box2d.B2FixtureDef {
+	// Shape
+	shape := box2d.MakeB2CircleShape()
+	shape.M_radius = 1
+
+	// fixture
+	fd := box2d.MakeB2FixtureDef()
+	fd.Shape = &shape
+	fd.Density = 1
+	fd.Restitution = 0
+	fd.Friction = 1
+
+	fd.Filter.GroupIndex = -1 // Food do not collide
+
 	return &fd
 }
