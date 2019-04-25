@@ -4,6 +4,7 @@ const UserJoinRequestType = 3;
 const UserJoinResponseType = 4;
 const CreateCookieRequestType = 5;
 const CreateCookieResponseType= 6;
+const StatsResponseType = 7;
 
 
 

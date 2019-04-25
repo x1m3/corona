@@ -14,7 +14,7 @@ func NewBotsManager(g *cookies.Game) *BotsManager {
 }
 
 func (m *BotsManager) Init() {
-	t := time.NewTicker(500 * time.Millisecond)
+	t := time.NewTicker(5 * time.Second)
 	for {
 		<- t.C
 		go func() {

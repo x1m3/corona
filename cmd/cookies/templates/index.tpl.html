@@ -117,6 +117,15 @@
                 }
             );
 
+            game.transport.registerCallback(
+                StatsResponseType,
+                function (msg) {
+                    console.log(game.state.getCurrentState().key);
+                    console.log(msg);
+                    hud.setText(this.zoomFactor + " zoom " + msg.Data.CC + " players/" + msg.Data.FC + " food.", false);
+                }
+            );
+
             var input = game.add.inputField((this.game.width - login_width) / 2, (this.game.height - login_height) / 2, {
                 width: login_width,
                 height: login_height,
@@ -185,6 +194,12 @@
             );
 
             game.transport.send(new CreateCookieRequest());
+
+            hud = game.add.text(10, 10, "", {font: "14px Arial", fill: "#ffffff", align: "left"});
+            hud.fixedToCamera = true;
+            hud.smoothed = true;
+            hud.cameraOffset.setTo(10, 10);
+
         },
         update: function () {
             if (game.myCookie !== null) {
@@ -275,16 +290,14 @@
                     serverCookies.forEach(function (info) {
                         if (info.ID === cookie.custom.id) {
                             game.physics.arcade.moveToXY(cookie, meters2Pixels(info.X), meters2Pixels(info.Y), 0, 1.5 * 1000 * gameProperties.updateClientPeriod);
-                            cookie.body.angularVelocity = info.SC * info.SC /100;
+                            cookie.body.angularVelocity = info.SC * info.SC / 100;
 
                             if (cookie.custom.score !== info.SC) {
                                 var len = meters2Pixels(Math.sqrt(info.SC) + Math.log2(info.SC));
                                 cookie.width = len;
                                 cookie.height = len;
                                 cookie.custom.score = info.SC;
-                                console.log(len);
                             }
-
 
                             cookie.custom.label.setText(cookie.custom.id + '\n[' + info.SC + ']');
                             cookie.custom.label.x = meters2Pixels(info.X);
@@ -360,7 +373,9 @@
     function updateZoom(game) {
         if (game.myCookie.custom !== undefined) {
             var score = game.myCookie.custom.score;
-            this.zoomFactor =  75 / meters2Pixels(Math.log2(score));
+            this.zoomFactor = 75 / meters2Pixels(Math.log2(score));
+            hud.scale.x = 1/this.zoomFactor;
+            hud.scale.y = 1/this.zoomFactor;
             game.world.scale.setTo(this.zoomFactor);
         }
     }
