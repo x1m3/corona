@@ -5,11 +5,11 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/x1m3/elixir/games/cookies"
-	"github.com/x1m3/elixir/games/cookies/bots"
 	"html/template"
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/x1m3/elixir/games/cookies/codec/json"
@@ -55,11 +55,11 @@ func main() {
 		IdleTimeout:  serverHTTPKeepAliveTimeout,
 	}
 
-	go game.Init()
+	//lala go game.Init()
 	log.Println("Starting Server")
 
-	botsManager := bots.NewBotsManager(game)
-	go botsManager.Init()
+	// lala botsManager := bots.NewBotsManager(game)
+	// lala go botsManager.Init()
 
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
@@ -69,7 +69,16 @@ func main() {
 }
 
 func indexAction(resp http.ResponseWriter, req *http.Request) {
-	index, err := template.ParseFiles("templates/index.tpl.html")
+	params := req.URL.Query()
+
+	home := "templates/index.tpl.html"
+	if engine, found := params["engine"]; found {
+		if strings.ToLower(engine[0])=="babylonjs" {
+			home = "templates/index.babylon.tpl.html"
+		}
+	}
+
+	index, err := template.ParseFiles(home)
 	if err != nil {
 		resp.WriteHeader(http.StatusInternalServerError)
 		resp.Header().Set("Content-Type", "text/html")

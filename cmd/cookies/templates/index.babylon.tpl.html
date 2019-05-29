@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
+    <style>
+        html, body {
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        #renderCanvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+    </style>
+
+
+    <script src="/static/js/jquery-3.3.1.min.js"></script>
+    <script src="/static/js/node_modules/msgpack-lite/dist/msgpack.min.js"></script>
+    <script src="/static/js/messages.js"></script>
+    <script src="/static/js/transport.js"></script>
+
+    <script src="https://preview.babylonjs.com/babylon.js"></script>
+    <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <script src="https://preview.babylonjs.com/gui/babylon.gui.min.js"></script>
+    <script src="https://code.jquery.com/pep/0.4.3/pep.js"></script>
+</head>
+<body>
+<canvas id="renderCanvas" touch-action="none"></canvas>
+
+<script>
+    var cookies = new Map();
+</script>
+
+<script>
+
+    var canvas_width = window.innerWidth * window.devicePixelRatio;
+    var canvas_height = window.innerHeight * window.devicePixelRatio;
+    var lastUpdate = Date.now();
+    var efectiveUpdatePeriod = 0;
+
+    var gameProperties = {
+        gameWidthMeters:{{.GameWidth}},
+        gameHeightMeters:{{.GameHeight}},
+        updateClientPeriod:{{.UpdateClientPeriod}},
+        pixels2Meters:{{.PixelsToMeters}}
+    };
+
+
+    var zoomFactor = 1;
+
+    $(document).ready(function () {
+        var canvas = document.getElementById("renderCanvas"); // Get the canvas element
+        var engine = new BABYLON.Engine(canvas, true); // Generate the BABYLON 3D engine
+        start(canvas, engine);
+
+
+    });
+
+    function start(canvas, engine) {
+
+        var scene = introScene(canvas, engine); //Call the createScene function
+
+        // Register a render loop to repeatedly render the scene
+        engine.runRenderLoop(function () {
+            scene.render();
+        });
+
+        // Watch for browser/canvas resize events
+        window.addEventListener("resize", function () {
+            engine.resize();
+        });
+    }
+
+    var introScene = function (canvas, engine) {
+
+        // This creates a basic Babylon Scene object (non-mesh)
+        var scene = new BABYLON.Scene(engine);
+
+        // This creates and positions a free camera (non-mesh)
+        var camera = new BABYLON.FreeCamera("camera1", new BABYLON.Vector3(0, 5, -10), scene);
+
+        // This targets the camera to scene origin
+        camera.setTarget(BABYLON.Vector3.Zero());
+
+        // This attaches the camera to the canvas
+        camera.attachControl(canvas, true);
+
+        // This creates a light, aiming 0,1,0 - to the sky (non-mesh)
+        var light = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(0, 1, 0), scene);
+
+        // Default intensity is 1. Let's dim the light a small amount
+        light.intensity = 0.7;
+
+        // GUI
+        var advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+
+        var panel = new BABYLON.GUI.StackPanel();
+        advancedTexture.addControl(panel);
+
+        var input = new BABYLON.GUI.InputText();
+        input.width = 0.2;
+        input.maxWidth = 0.2;
+        input.height = "40px";
+        input.text = "Your name";
+        input.color = "white";
+        input.background = "blue";
+        input.onFocusObservable.add(function() {
+            input.text="";
+        });
+
+        input.onBlurObservable.add(function() {
+            alert(input.text);
+        });
+
+
+        panel.addControl(input);
+
+        var playButton = BABYLON.GUI.Button.CreateSimpleButton("but2", "Enter Arena");
+        playButton.width = 0.2;
+        playButton.height = "40px";
+        playButton.color = "white";
+        playButton.background = "blue";
+
+        playButton.onPointerDownObservable.add(function() {
+            alert(input.text);
+        });
+        panel.addControl(playButton);
+
+        return scene;
+
+
+
+    };
+
+
+    var createScene = function (canvas, engine) {
+
+        // Create the scene space
+        var scene = new BABYLON.Scene(engine);
+
+        // Add a camera to the scene and attach it to the canvas
+        var camera = new BABYLON.ArcRotateCamera("Camera", Math.PI / 2, Math.PI / 2, 2, new BABYLON.Vector3(0, 0, 5), scene);
+        camera.attachControl(canvas, true);
+
+        // Add lights to the scene
+        var light1 = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(1, 1, 0), scene);
+        var light2 = new BABYLON.PointLight("light2", new BABYLON.Vector3(0, 1, -1), scene);
+
+        // Add and manipulate meshes in the scene
+        var sphere = BABYLON.MeshBuilder.CreateSphere("sphere", {diameter: 2}, scene);
+
+        return scene;
+    };
+
+
+    var logo = function (game) {
+    };
+    logo.prototype = {
+        preload: function () {
+
+        },
+        create: function () {
+            game.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
+            this.scale.pageAlignHorizontally = true;
+            game.scale.compatibility.scrollTo = false;
+            game.time.desiredFps = 48;
+            game.time.advancedTiming = true;
+            game.stage.disableVisibilityChange = true;
+
+            game.physics.startSystem(Phaser.Physics.ARCADE);
+            this.state.start('load');
+        }
+    };
+
+
+    var load = function (game) {
+    };
+    load.prototype = {
+        preload: function () {
+            this.splash = this.add.sprite(this.game.world.centerX, this.game.world.centerY, 'logo-intro');
+            this.splash.anchor.setTo(0.5);
+
+            game.load.image("background", "/static/img/bg1.png");
+            game.load.image("cookie1", "/static/img/spinner1.png");
+            game.load.image("cookie2", "/static/img/spinner2.png");
+            game.load.image("cookie3", "/static/img/spinner3.png");
+            game.load.image("firefox", "/static/img/firefox.png");
+            game.load.image("login-button", "/static/img/button_play.png");
+            game.load.script('filter1', '/static/js/phaser-2.6.2/filters/Gray.js');
+            game.add.plugin(PhaserInput.Plugin);
+        },
+        create: function () {
+            let newState = this.state;
+            console.log("En el load");
+            window.setTimeout(function () {
+                newState.start('menu');
+            }, 1000);
+        }
+    };
+
+    var menu = function (game) {
+    };
+    menu.prototype = {
+        preload: function () {
+            game.canvas.id = 'canvas_game';
+            $("#login-form").appendTo("#canvas_game");
+        },
+        create: function () {
+            const login_width = 400;
+            const login_height = 50;
+            const button_width = 400;
+            const button_height = 50;
+
+            console.log("En el menu");
+
+            bg = game.add.tileSprite(0, 0, this.game.width, this.game.height, 'background');
+            bg.alpha = 0.7;
+            bg.autoScroll(-10, -5);
+
+            game.transport.registerCallback(
+                UserJoinResponseType,
+                function (msg) {
+                    console.log(msg);
+                    game.state.start('main');
+                }
+            );
+
+            game.transport.registerCallback(
+                StatsResponseType,
+                function (msg) {
+                    console.log(game.state.getCurrentState().key);
+                    console.log(msg);
+                    hud.setText(this.zoomFactor + " zoom " + msg.Data.CC + " players/" + msg.Data.FC + " food.", false);
+                }
+            );
+
+            var input = game.add.inputField((this.game.width - login_width) / 2, (this.game.height - login_height) / 2, {
+                width: login_width,
+                height: login_height,
+                type: "text",
+                borderWidth: 2,
+                borderColor: "#FFFF00",
+                borderRadius: 5,
+                placeHolder: "Your name?",
+                backgroundColor: "#FFFFAA",
+                font: '42px Arial',
+            });
+            input.startFocus();
+
+            button = game.add.button(
+                (this.game.width - login_width) / 2,
+                70 + (this.game.height - login_height) / 2,
+                'login-button',
+                function () {
+                    if (input.value !== "") {
+                        game.transport.send(new UserJoinRequest(input.value));
+                    }
+                },
+                this,
+                2,
+                1,
+                0
+            );
+
+        }
+    };
+
+    var main = function (game) {
+    };
+    main.prototype = {
+        preload: function () {
+            game.world.setBounds(0, 0, meters2Pixels(gameProperties.gameWidthMeters), meters2Pixels(gameProperties.gameHeightMeters), false, false, false, false);
+        },
+
+        //this function is fired once when we load the game
+        create: function () {
+            console.log("En el main");
+            var width = meters2Pixels(gameProperties.gameWidthMeters);
+            var height = meters2Pixels(gameProperties.gameHeightMeters);
+            bg = game.add.tileSprite(0, 0, width, height, 'background');
+            bg.alpha = 0;
+            game.add.tween(bg).to({alpha: 1}, 1000, Phaser.Easing.Linear.None, true);
+
+            createCamera(game);
+
+            game.transport.registerCallback(
+                CreateCookieResponseType,
+                function (msg) {
+                    cookie = createCookie(game, msg.d.ID, msg.d.X, msg.d.Y, msg.d.SC);
+                    game.myCookie = cookie;
+                    game.camera.follow(cookie, Phaser.Camera.FOLLOW_LOCKON, 1, 1);
+
+                }
+            );
+
+            game.transport.registerCallback(
+                ViewPortResponseType,
+                function (msg) {
+                    updateCookies(game, msg.C);
+                    updateFood(game, msg.F);
+                }
+            );
+
+            game.transport.send(new CreateCookieRequest());
+
+            hud = game.add.text(10, 10, "", {font: "14px Arial", fill: "#ffffff", align: "left"});
+            hud.fixedToCamera = true;
+            hud.smoothed = true;
+            hud.cameraOffset.setTo(10, 10);
+
+        },
+        update: function () {
+            if (game.myCookie !== null) {
+                updateCamera(game);
+                // Launch in a timer.. we do not need to update constantly
+                updateZoom(game);
+            }
+        },
+        render: function () {
+            //console.log('FPS: ' + game.time.fps || 'FPS: --', 40, 40, "#00ff00");
+        },
+    };
+
+    function createCookie(game, id, x, y, score) {
+        var cookie = game.add.sprite(meters2Pixels(x), meters2Pixels(y), "firefox");
+        cookie.custom = {};
+        cookie.custom.id = id;
+        cookie.custom.score = score;
+        cookie.custom.type = "cookie";
+        cookie.alpha = 0;
+        cookie.anchor.setTo(0.5, 0.5);
+        var len = meters2Pixels(Math.sqrt(score) + Math.log2(score));
+        cookie.width = len;
+        cookie.height = len;
+        cookie.maxAngular = 100000;
+        cookie.angularDrag = 0;
+
+        // Text
+        var style = {
+            font: "24px Arial",
+            fill: "#ffffaa",
+            wordWrap: true,
+            wordWrapWidth: cookie.width,
+            align: "center",
+            backgroundColor: "#111111"
+        };
+        cookie.custom.label = game.add.text(meters2Pixels(x), meters2Pixels(y), cookie.custom.id + '\n[' + cookie.custom.score + ']', style);
+        cookie.custom.label.anchor.set(0.5);
+        cookie.custom.label.alpha = 0.7;
+
+        cookie.visible = true;
+        /*
+        var filter = game.add.filter('Gray');
+        filter.blur = 0.05 * msg.SC;
+        //ant.filters = [filter];
+        */
+        game.add.tween(cookie).to({alpha: 1}, 500, Phaser.Easing.None, true);
+        game.physics.enable(cookie, Phaser.Physics.ARCADE);
+        cookie.body.allowRotation = true;
+        cookie.body.angularVelocity = 1;
+
+        return cookie;
+    }
+
+    function createFood(game, id, x, y, score) {
+        var food = game.add.sprite(meters2Pixels(x), meters2Pixels(y), "cookie1");
+        food.custom = {};
+        food.custom.id = id;
+        food.custom.score = score;
+        food.custom.type = "food";
+
+        food.anchor.setTo(0.5, 0.5);
+        food.width = meters2Pixels(1);
+        food.height = meters2Pixels(1);
+        food.alpha = 0;
+        food.visible = true;
+
+        game.add.tween(food).to({alpha: 1}, 500, Phaser.Easing.None, true);
+        game.physics.enable(food, Phaser.Physics.ARCADE);
+    }
+
+    function updateCookies(game, serverCookies) {
+
+        // sortedIDs contains all ids in serverCookies sorted ascending
+        var sortedIDs = IDsByOrder(serverCookies);
+
+        // Positioning or removing known cookies
+        game.world.forEach(function (cookie) {
+            if (cookie.custom !== undefined && cookie.custom.type === "cookie") {
+                // Not in list. We should disable
+                if (sortedIDs.indexOf(cookie.custom.id) === -1 && cookie.custom.id !== game.myCookie.custom.id) {
+                    cookie.visible = false;
+                    cookie.custom.label.destroy();
+                    cookie.destroy();
+
+                } else { // In list. We should update position
+                    cookie.visible = true;
+                    serverCookies.forEach(function (info) {
+                        if (info.ID === cookie.custom.id) {
+                            game.physics.arcade.moveToXY(cookie, meters2Pixels(info.X), meters2Pixels(info.Y), 0, 1.5 * 1000 * gameProperties.updateClientPeriod);
+                            cookie.body.angularVelocity = info.SC * info.SC / 100;
+
+                            if (cookie.custom.score !== info.SC) {
+                                var len = meters2Pixels(Math.sqrt(info.SC) + Math.log2(info.SC));
+                                cookie.width = len;
+                                cookie.height = len;
+                                cookie.custom.score = info.SC;
+                            }
+
+                            cookie.custom.label.setText(cookie.custom.id + '\n[' + info.SC + ']');
+                            cookie.custom.label.x = meters2Pixels(info.X);
+                            cookie.custom.label.y = meters2Pixels(info.Y) + cookie.body.height / 2 + 50;
+
+                            sortedIDs.splice(sortedIDs.indexOf(info.ID), 1);
+
+                        }
+                    });
+                }
+            }
+        }, this, true);
+
+        sortedIDs.forEach(function (id) {
+            serverCookies.forEach(function (info) {
+                if (info.ID === id) {
+                    var cookie = createCookie(game, id, info.X, info.Y, info.SC);
+                }
+            })
+        });
+    }
+
+    function updateFood(game, serverFood) {
+        // sortedIDs contains all ids in serverCookies sorted ascending
+        var sortedIDs = IDsByOrder(serverFood);
+
+        game.world.forEach(function (food) {
+            if (food.custom !== undefined && food.custom.type === "food") {
+                // Not in list. We should remove
+                if (sortedIDs.indexOf(food.custom.id) === -1) {
+                    food.visible = false;
+                    food.destroy();
+                } else {
+                    serverFood.forEach(function (info) {
+                        if (info.ID === food.custom.id) {
+                            game.physics.arcade.moveToXY(food, meters2Pixels(info.X), meters2Pixels(info.Y), 0, 1.5 * 1000 * gameProperties.updateClientPeriod);
+                        }
+                    });
+                    sortedIDs.splice(sortedIDs.indexOf(food.custom.id), 1);
+                }
+            }
+        }, this, true);
+
+        sortedIDs.forEach(function (id) {
+            serverFood.forEach(function (info) {
+                if (info.ID === id) {
+                    var food = createFood(game, id, info.X, info.Y, info.SC);
+                }
+            })
+        });
+    }
+
+    function IDsByOrder(l) {
+        var ids = [];
+        l.forEach(function (el) {
+            ids.push(el.ID)
+        });
+        return ids.sort(function (a, b) {
+            return a - b;
+        });
+    }
+
+
+    function createCamera(game) {
+
+        var cameraFocusX = 100;
+        var cameraFocusY = 200;
+
+        game.world.scale.setTo(this.zoomFactor);
+        game.camera.focusOnXY(cameraFocusX * game.world.scale.x, cameraFocusY * game.world.scale.y);
+    }
+
+    function updateZoom(game) {
+        if (game.myCookie.custom !== undefined) {
+            var score = game.myCookie.custom.score;
+            this.zoomFactor = 75 / meters2Pixels(Math.log2(score));
+            hud.scale.x = 1 / this.zoomFactor;
+            hud.scale.y = 1 / this.zoomFactor;
+            game.world.scale.setTo(this.zoomFactor);
+        }
+    }
+
+    function updateCamera(game) {
+
+        var cam = game.camera;
+        var cookie = game.myCookie;
+        var angle = Math.atan2((game.input.worldY / game.world.scale.y - cookie.y), (game.input.worldX / game.world.scale.x - cookie.x));
+
+        var msg = new ViewPortRequest(
+            0.7 * pixels2Meters(cam.x / game.world.scale.x),
+            0.7 * pixels2Meters(cam.y / game.world.scale.y),
+            1.3 * pixels2Meters((cam.x + cam.width) / game.world.scale.x),
+            1.3 * pixels2Meters((cam.y + cam.height) / game.world.scale.y),
+            angle,
+            this.game.input.activePointer.isDown
+        );
+
+        game.transport.send(msg);
+    }
+
+
+    function refreshAntsPosition(positions) {
+
+        cookies.forEach(function (ant) {
+            ant.visible = false
+        });
+
+        positions.Ants.forEach(function (newPosition) {
+            var ant = null;
+            var previous = cookies.get(newPosition.ID);
+            if (previous) {
+                ant = previous.ant;
+            }
+            cookies.set(newPosition.ID, {
+                ant: ant,
+                Score: newPosition.SC,
+                X: meters2Pixels(newPosition.X),
+                Y: meters2Pixels(newPosition.Y),
+                visible: true,
+            });
+        });
+    }
+
+    function meters2Pixels(meters) {
+        return meters * gameProperties.pixels2Meters;
+    }
+
+    function pixels2Meters(pixels) {
+        return pixels / gameProperties.pixels2Meters;
+    }
+
+</script>
+
+
+</body>
+</html>
