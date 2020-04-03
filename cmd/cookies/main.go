@@ -2,19 +2,20 @@ package main
 
 import (
 	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/gorilla/websocket"
-	"github.com/x1m3/elixir/games/cookies"
 	"html/template"
 	"io"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"strings"
 	"time"
 
-	"github.com/x1m3/elixir/games/cookies/codec/json"
-	"github.com/x1m3/elixir/games/cookies/messages"
-	_ "net/http/pprof"
+	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
+
+	"github.com/x1m3/corona/games/cookies"
+	"github.com/x1m3/corona/games/cookies/codec/json"
+	"github.com/x1m3/corona/games/cookies/messages"
 )
 
 const (
@@ -73,7 +74,7 @@ func indexAction(resp http.ResponseWriter, req *http.Request) {
 
 	home := "templates/index.tpl.html"
 	if engine, found := params["engine"]; found {
-		if strings.ToLower(engine[0])=="babylonjs" {
+		if strings.ToLower(engine[0]) == "babylonjs" {
 			home = "templates/index.babylon.tpl.html"
 		}
 	}

@@ -1,15 +1,16 @@
 package cookies
 
 import (
-	"fmt"
-	"github.com/x1m3/elixir/games/cookies/codec"
-	"github.com/gorilla/websocket"
 	"errors"
-	"github.com/x1m3/elixir/games/cookies/messages"
+	"fmt"
 	"io"
 	"time"
-)
 
+	"github.com/gorilla/websocket"
+
+	"github.com/x1m3/corona/games/cookies/codec"
+	"github.com/x1m3/corona/games/cookies/messages"
+)
 
 type connection interface {
 	io.Closer
@@ -19,11 +20,11 @@ type connection interface {
 
 type WebsocketConnection struct {
 	messageType int
-	conn *websocket.Conn
+	conn        *websocket.Conn
 }
 
 func NewWebsocketConnection(c *websocket.Conn) *WebsocketConnection {
-	return &WebsocketConnection{conn:c, messageType:websocket.TextMessage}
+	return &WebsocketConnection{conn: c, messageType: websocket.TextMessage}
 }
 
 func (c *WebsocketConnection) Close() error {
@@ -48,23 +49,23 @@ func (c *WebsocketConnection) ReadMessage() (p []byte, err error) {
 
 type Transport struct {
 	conn connection
-	e codec.MarshalUnmarshaler
+	e    codec.MarshalUnmarshaler
 }
 
 func NewTransport(e codec.MarshalUnmarshaler, c connection) *Transport {
 	return &Transport{e: e, conn: c}
 }
 
-func(t *Transport) Send(msg messages.Message) error {
+func (t *Transport) Send(msg messages.Message) error {
 	data, err := t.marshal(msg)
-	if err!=nil {
+	if err != nil {
 		return err
 	}
 
 	return t.conn.WriteMessage(data)
 }
 
-func(t *Transport) Receive() (messages.Message, error) {
+func (t *Transport) Receive() (messages.Message, error) {
 	for {
 
 		data, err := t.conn.ReadMessage()
@@ -76,11 +77,9 @@ func(t *Transport) Receive() (messages.Message, error) {
 	}
 }
 
-func(t *Transport) Close() error {
+func (t *Transport) Close() error {
 	return t.conn.Close()
 }
-
-
 
 func (t *Transport) marshal(data messages.Message) ([]byte, error) {
 	return t.e.Marshal(data)
@@ -105,7 +104,7 @@ func (t *Transport) unmarshal(data []byte) (messages.Message, error) {
 	case messages.CreateCookieRequestType:
 		msg = &messages.CreateCookieRequest{}
 	default:
-		return nil, fmt.Errorf("unknown message type <%s>", baseMsg.GetType())
+		return nil, fmt.Errorf("unknown message type <%v>", baseMsg.GetType())
 	}
 
 	if err := t.e.Unmarshal(baseMsg.Data, msg); err != nil {

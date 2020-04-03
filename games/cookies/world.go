@@ -2,17 +2,19 @@ package cookies
 
 import (
 	"fmt"
-	"github.com/ByteArena/box2d"
-	"github.com/x1m3/elixir/games/cookies/messages"
-	"github.com/x1m3/elixir/games/cookies/mybox2d"
-	"github.com/x1m3/elixir/games/cookies/sessionmanager"
-	"github.com/x1m3/elixir/pkg/list"
 	"log"
 	"math"
 	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/ByteArena/box2d"
+
+	"github.com/x1m3/corona/games/cookies/messages"
+	"github.com/x1m3/corona/games/cookies/mybox2d"
+	"github.com/x1m3/corona/games/cookies/sessionmanager"
+	"github.com/x1m3/corona/pkg/list"
 )
 
 type world struct {
@@ -230,7 +232,7 @@ func (w *world) runFoodTasks() {
 
 		task := o.(throwFoodTask)
 
-		for i := 0; i < task.count; i ++ {
+		for i := 0; i < task.count; i++ {
 			w.addFoodToWorld(task.x, task.y, 1, rand.Intn(100000))
 		}
 		atomic.AddUint64(&w.foodCount, uint64(task.count))
