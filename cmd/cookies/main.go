@@ -13,9 +13,10 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 
-	"github.com/x1m3/corona/games/cookies"
-	"github.com/x1m3/corona/games/cookies/codec/json"
-	"github.com/x1m3/corona/games/cookies/messages"
+	"github.com/x1m3/corona/internal/bots"
+	"github.com/x1m3/corona/internal/codec/json"
+	"github.com/x1m3/corona/internal/corona"
+	"github.com/x1m3/corona/internal/messages"
 )
 
 const (
@@ -30,11 +31,11 @@ const (
 	serverHTTPKeepAliveTimeout = 5 * time.Second  // Keep alive timeout. Time to close an idle connection if keep alive is enable
 )
 
-var game *cookies.Game
+var game *corona.Game
 
 func main() {
 
-	game = cookies.New(gameWidthMeters, gameHeightMeters, updateClientPeriod)
+	game = corona.New(gameWidthMeters, gameHeightMeters, updateClientPeriod)
 
 	router := &mux.Router{}
 	router.NotFoundHandler = func() http.HandlerFunc {
@@ -56,11 +57,11 @@ func main() {
 		IdleTimeout:  serverHTTPKeepAliveTimeout,
 	}
 
-	//lala go game.Init()
+	go game.Init()
 	log.Println("Starting Server")
 
-	// lala botsManager := bots.NewBotsManager(game)
-	// lala go botsManager.Init()
+	botsManager := bots.NewManager(game)
+	go botsManager.Init()
 
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
@@ -118,7 +119,7 @@ func wsAction(resp http.ResponseWriter, req *http.Request) {
 
 	sessionID, responses, endOfGame := game.NewSession()
 
-	transport := cookies.NewTransport(json.Codec, cookies.NewWebsocketConnection(conn))
+	transport := corona.NewTransport(json.Codec, corona.NewWebsocketConnection(conn))
 
 	go handleWSRequests(transport, sessionID)
 
@@ -127,7 +128,7 @@ func wsAction(resp http.ResponseWriter, req *http.Request) {
 	log.Println("New Connection")
 }
 
-func manageRemoteView(transport *cookies.Transport, sessionID uint64, responses chan interface{}, endOfGame chan interface{}) {
+func manageRemoteView(transport *corona.Transport, sessionID uint64, responses chan interface{}, endOfGame chan interface{}) {
 	for {
 		select {
 		case req, ok := <-responses:
@@ -148,7 +149,7 @@ func manageRemoteView(transport *cookies.Transport, sessionID uint64, responses 
 	}
 }
 
-func handleWSRequests(transport *cookies.Transport, sessionID uint64) {
+func handleWSRequests(transport *corona.Transport, sessionID uint64) {
 	var resp messages.Message
 	var errResp error
 
