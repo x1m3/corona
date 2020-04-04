@@ -2,10 +2,12 @@ package bots
 
 import (
 	"github.com/pkg/errors"
-	"github.com/x1m3/elixir/games/cookies"
-	"github.com/x1m3/elixir/games/cookies/messages"
+
 	"log"
 	"time"
+
+	"github.com/x1m3/corona/games/cookies"
+	"github.com/x1m3/corona/games/cookies/messages"
 )
 
 type BotAgent interface {
@@ -37,7 +39,7 @@ func (b *Bot) Run() error {
 	var err error
 
 	// Creating a session
-	b.sessionID, b.responses, b.endOfGame= b.game.NewSession()
+	b.sessionID, b.responses, b.endOfGame = b.game.NewSession()
 
 	// Joining step1
 	resp, err = b.game.UserJoin(b.sessionID, b.agent.Join())

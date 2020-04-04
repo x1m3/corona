@@ -2,21 +2,23 @@ package bots
 
 import (
 	"github.com/stretchr/testify/assert"
-	"github.com/x1m3/elixir/games/cookies"
-	"github.com/x1m3/elixir/games/cookies/messages"
+
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/x1m3/corona/games/cookies"
+	"github.com/x1m3/corona/games/cookies/messages"
 )
 
 type spyAgent struct {
 	sync.Mutex
-	joinCalls int
-	joinResponseCalls int
-	CreateCookieCalls int
+	joinCalls                 int
+	joinResponseCalls         int
+	CreateCookieCalls         int
 	CreateCookieResponseCalls int
-	MoveCalls int
-	UpdateViewWorldCalls int
+	MoveCalls                 int
+	UpdateViewWorldCalls      int
 }
 
 func (a *spyAgent) Join() *messages.UserJoinRequest {
@@ -49,7 +51,7 @@ func (a *spyAgent) Move() *messages.ViewPortRequest {
 	a.Lock()
 	a.MoveCalls++
 	a.Unlock()
-	return messages.NewViewPortRequest(0,0,1000,1000, 0, false)
+	return messages.NewViewPortRequest(0, 0, 1000, 1000, 0, false)
 }
 
 func (a *spyAgent) UpdateViewWorld(w *messages.ViewportResponse) {
@@ -73,10 +75,10 @@ func TestBot_Run(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	spy.Lock()
-	assert.Equal(t, spy.joinCalls  ,1)
-	assert.Equal(t, spy.joinResponseCalls  ,1)
-	assert.Equal(t, spy.CreateCookieCalls  ,1)
-	assert.Equal(t, spy.CreateCookieResponseCalls,1)
+	assert.Equal(t, spy.joinCalls, 1)
+	assert.Equal(t, spy.joinResponseCalls, 1)
+	assert.Equal(t, spy.CreateCookieCalls, 1)
+	assert.Equal(t, spy.CreateCookieResponseCalls, 1)
 
 	assert.NotEqual(t, spy.MoveCalls, 0)
 	assert.NotEqual(t, spy.UpdateViewWorldCalls, 0)

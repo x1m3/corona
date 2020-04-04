@@ -3,19 +3,21 @@ package cookies
 import (
 	"errors"
 	"fmt"
-	"github.com/ByteArena/box2d"
-	"github.com/x1m3/elixir/games/cookies/messages"
-	"github.com/x1m3/elixir/games/cookies/sessionmanager"
 	"log"
 	"math/rand"
 	"time"
+
+	"github.com/ByteArena/box2d"
+
+	"github.com/x1m3/corona/games/cookies/messages"
+	"github.com/x1m3/corona/games/cookies/sessionmanager"
 )
 
 type Game struct {
-	gSessions          *sessionmanager.Sessions
-	world              *world
-	width              float64
-	height             float64
+	gSessions *sessionmanager.Sessions
+	world     *world
+	width     float64
+	height    float64
 }
 
 // New returns a new cookies game.
@@ -24,10 +26,10 @@ func New(widthX, widthY float64, updateClientPeriod time.Duration) *Game {
 	gameSessions := sessionmanager.New()
 
 	return &Game{
-		gSessions:          gameSessions,
-		world:              NewWorld(gameSessions, widthX, widthY, 30, 45, 45, 70, 2500, updateClientPeriod),
-		width:              widthX,
-		height:             widthY,
+		gSessions: gameSessions,
+		world:     NewWorld(gameSessions, widthX, widthY, 30, 45, 45, 70, 2500, updateClientPeriod),
+		width:     widthX,
+		height:    widthY,
 	}
 }
 

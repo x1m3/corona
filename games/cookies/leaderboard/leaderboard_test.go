@@ -2,11 +2,12 @@ package leaderboard_test
 
 import (
 	"github.com/stretchr/testify/assert"
-	"github.com/x1m3/elixir/games/cookies/leaderboard"
+
 	"sync"
 	"testing"
-)
 
+	"github.com/x1m3/corona/games/cookies/leaderboard"
+)
 
 func TestLeaderBoard_Case1(t *testing.T) {
 
@@ -32,7 +33,7 @@ func TestLeaderBoard_Case1(t *testing.T) {
 
 	lastScore := int64(-100000)
 	for i, n := range nodes {
-		if lastScore>n.Score {
+		if lastScore > n.Score {
 			t.Errorf("Leaderboad has wrong order. Check element %d", i)
 		}
 		lastScore = n.Score
@@ -44,10 +45,9 @@ func TestLeaderBoard_Case1(t *testing.T) {
 
 	lastScore = int64(100000)
 	for i, n := range nodes {
-		if lastScore<n.Score {
+		if lastScore < n.Score {
 			t.Errorf("Leaderboad has wrong order. Check element %d", i)
 		}
 		lastScore = n.Score
 	}
 }
-

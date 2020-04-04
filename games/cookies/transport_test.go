@@ -1,15 +1,16 @@
 package cookies_test
 
 import (
-	"testing"
 	"github.com/stretchr/testify/assert"
+	"testing"
 
-	"github.com/x1m3/elixir/games/cookies/codec/json"
-	"github.com/x1m3/elixir/games/cookies/codec"
-	"github.com/x1m3/elixir/games/cookies/codec/msgpack"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/x1m3/elixir/games/cookies/messages"
-	"github.com/x1m3/elixir/games/cookies"
+
+	"github.com/x1m3/corona/games/cookies"
+	"github.com/x1m3/corona/games/cookies/codec"
+	"github.com/x1m3/corona/games/cookies/codec/json"
+	"github.com/x1m3/corona/games/cookies/codec/msgpack"
+	"github.com/x1m3/corona/games/cookies/messages"
 )
 
 type dummyConnection struct {
@@ -27,7 +28,7 @@ func (c *dummyConnection) WriteMessage(data []byte) error {
 
 func (c *dummyConnection) ReadMessage() (p []byte, err error) {
 	item := c.msgs[len(c.msgs)-1]
-	c.msgs = c.msgs[0:len(c.msgs)-1]
+	c.msgs = c.msgs[0 : len(c.msgs)-1]
 	return item, nil
 }
 
@@ -74,4 +75,3 @@ func BenchmarkTransport_MarshalMsgPack(b *testing.B) {
 		transport.Send(msg)
 	}
 }
-

@@ -1,22 +1,24 @@
 package bots
 
 import (
-	"github.com/x1m3/elixir/games/cookies"
 	"log"
 	"time"
+
+	"github.com/x1m3/corona/games/cookies"
 )
 
 type BotsManager struct {
 	game *cookies.Game
 }
+
 func NewBotsManager(g *cookies.Game) *BotsManager {
-	return &BotsManager{game:g}
+	return &BotsManager{game: g}
 }
 
 func (m *BotsManager) Init() {
 	t := time.NewTicker(5 * time.Second)
 	for {
-		<- t.C
+		<-t.C
 		go func() {
 			bot := New(m.game, NewDummyBotAgent(200, 200))
 			log.Println("Bot started")
