@@ -7,7 +7,7 @@ import (
 	"log"
 	"net/http"
 	_ "net/http/pprof"
-	"strings"
+	"os"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -42,7 +42,7 @@ func main() {
 		return func(resp http.ResponseWriter, req *http.Request) {
 			resp.WriteHeader(http.StatusNotFound)
 			resp.Header().Set("Content-Type", "text/html")
-			io.WriteString(resp, "Not Found.")
+			_, _ = io.WriteString(resp, "Not Found.")
 		}
 	}()
 	router.HandleFunc("/", indexAction).Methods("GET")
@@ -71,20 +71,15 @@ func main() {
 }
 
 func indexAction(resp http.ResponseWriter, req *http.Request) {
-	params := req.URL.Query()
 
 	home := "templates/index.tpl.html"
-	if engine, found := params["engine"]; found {
-		if strings.ToLower(engine[0]) == "babylonjs" {
-			home = "templates/index.babylon.tpl.html"
-		}
-	}
-
 	index, err := template.ParseFiles(home)
 	if err != nil {
 		resp.WriteHeader(http.StatusInternalServerError)
+		cwd, _ := os.Getwd()
+		log.Printf("Error loading index. <working_dir:%s> <Error:%s", cwd, err.Error())
 		resp.Header().Set("Content-Type", "text/html")
-		io.WriteString(resp, err.Error())
+		_, _ = resp.Write([]byte("Error loading url"))
 		return
 	}
 	resp.WriteHeader(http.StatusOK)
